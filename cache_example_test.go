@@ -1,6 +1,7 @@
 package memcache_test
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -9,7 +10,9 @@ import (
 
 // Create a new cache using int keys and string values.
 func ExampleNew() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -17,7 +20,9 @@ func ExampleNew() {
 }
 
 func ExampleNew_withExpirationInterval() {
-	cache, err := memcache.New[int, string](memcache.WithExpirationInterval(1 * time.Minute))
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx, memcache.WithExpirationInterval(1*time.Minute))
 	if err != nil {
 		panic(err)
 	}
@@ -25,7 +30,9 @@ func ExampleNew_withExpirationInterval() {
 }
 
 func ExampleCache_Set() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +41,9 @@ func ExampleCache_Set() {
 }
 
 func ExampleCache_Set_withTTL() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +52,9 @@ func ExampleCache_Set_withTTL() {
 }
 
 func ExampleCache_Get() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +70,9 @@ func ExampleCache_Get() {
 }
 
 func ExampleCache_Get_keyNotFound() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +84,9 @@ func ExampleCache_Get_keyNotFound() {
 }
 
 func ExampleCache_Delete() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +102,9 @@ func ExampleCache_Delete() {
 }
 
 func ExampleCache_Flush() {
-	cache, err := memcache.New[int, string]()
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
 	if err != nil {
 		panic(err)
 	}

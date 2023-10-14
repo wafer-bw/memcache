@@ -1,6 +1,7 @@
 package memcache
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -10,13 +11,14 @@ import (
 type Cache[K comparable, V any] struct {
 	mu                 sync.RWMutex
 	store              map[K]record.Record[V]
+	expireOnGet        bool
 	expirationInterval time.Duration
-	evictionInterval   time.Duration
+
+	// TODO: add eviction support.
 }
 
-func New[K comparable, V any](options ...CacheConfigOption) (*Cache[K, V], error) {
+func New[K comparable, V any](ctx context.Context, options ...CacheConfigOption) (*Cache[K, V], error) {
 	config := CacheConfig{}
-
 	for _, option := range options {
 		if option == nil {
 			continue
@@ -26,12 +28,18 @@ func New[K comparable, V any](options ...CacheConfigOption) (*Cache[K, V], error
 		}
 	}
 
-	return &Cache[K, V]{
+	cache := &Cache[K, V]{
 		mu:                 sync.RWMutex{},
 		store:              map[K]record.Record[V]{},
-		evictionInterval:   config.evictionInterval,
+		expireOnGet:        config.expireOnGet,
 		expirationInterval: config.expirationInterval,
-	}, nil
+	}
+
+	if cache.expirationInterval > 0 {
+		go cache.expirer(ctx)
+	}
+
+	return cache, nil
 }
 
 func (c *Cache[K, V]) Set(key K, value V, options ...ValueConfigOption) {
@@ -54,9 +62,17 @@ func (c *Cache[K, V]) Set(key K, value V, options ...ValueConfigOption) {
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	r, ok := c.store[key]
+	if !ok {
+		return r.Value, ok
+	}
+	c.mu.RUnlock()
+
+	if c.expireOnGet && r.IsExpired() {
+		c.Delete(key)
+		var v V
+		return v, false
+	}
 
 	return r.Value, ok
 }
@@ -76,16 +92,15 @@ func (c *Cache[K, V]) Flush() {
 }
 
 type CacheConfig struct {
-	// mode             uint8
-	evictionInterval   time.Duration
+	expireOnGet        bool
 	expirationInterval time.Duration
 }
 
 type CacheConfigOption func(*CacheConfig) error
 
-func WithEvictionInterval(i time.Duration) CacheConfigOption {
+func WithExpireOnGet() CacheConfigOption {
 	return func(config *CacheConfig) error {
-		config.evictionInterval = i
+		config.expireOnGet = true
 		return nil
 	}
 }
@@ -107,5 +122,28 @@ func WithTTL(d time.Duration) ValueConfigOption {
 	return func(config *ValueConfig) {
 		expireAt := time.Now().Add(d)
 		config.expireAt = &expireAt
+	}
+}
+
+func (c *Cache[K, V]) expirer(ctx context.Context) {
+	// TODO: add unit tests for this.
+	ticker := time.NewTicker(c.expirationInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			// TODO: employ a more efficient algorithm for expiring records.
+			// https://redis.io/commands/expire/#:~:text=How%20Redis%20expires%20keys
+			for k, r := range c.store {
+				if r.IsExpired() {
+					delete(c.store, k)
+				}
+			}
+			c.mu.Unlock()
+		}
 	}
 }

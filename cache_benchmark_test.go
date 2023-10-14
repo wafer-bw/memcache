@@ -1,6 +1,7 @@
 package memcache_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -8,8 +9,10 @@ import (
 )
 
 func BenchmarkCache_Set(b *testing.B) {
+	ctx := context.Background()
+
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int]()
+		cache, err := memcache.New[int, int](ctx)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -26,8 +29,10 @@ func BenchmarkCache_Set(b *testing.B) {
 }
 
 func BenchmarkCache_Get(b *testing.B) {
+	ctx := context.Background()
+
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int]()
+		cache, err := memcache.New[int, int](ctx)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -44,8 +49,10 @@ func BenchmarkCache_Get(b *testing.B) {
 }
 
 func BenchmarkCache_Delete(b *testing.B) {
+	ctx := context.Background()
+
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int]()
+		cache, err := memcache.New[int, int](ctx)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -62,8 +69,10 @@ func BenchmarkCache_Delete(b *testing.B) {
 }
 
 func BenchmarkCache_Flush(b *testing.B) {
+	ctx := context.Background()
+
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int]()
+		cache, err := memcache.New[int, int](ctx)
 		if err != nil {
 			b.Fatal(err)
 		}

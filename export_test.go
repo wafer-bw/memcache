@@ -18,15 +18,11 @@ func (c *Cache[K, V]) GetMutex() *sync.RWMutex {
 }
 
 // export for testing.
-func (c *CacheConfig) GetEvictionInterval() time.Duration {
-	return c.evictionInterval
-}
-
-// export for testing.
-func (c *CacheConfig) GetExpirationInterval() time.Duration {
+func (c *Cache[K, V]) GetExpirationInterval() time.Duration {
 	return c.expirationInterval
 }
 
-func (c *ValueConfig) GetExpireAt() *time.Time {
-	return c.expireAt
+// export for testing.
+func (c *Cache[K, V]) GetExpireOnGet() bool {
+	return c.expireOnGet
 }

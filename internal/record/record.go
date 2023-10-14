@@ -7,7 +7,7 @@ type Record[V any] struct {
 	ExpireAt *time.Time
 }
 
-func (r Record[V]) Expired() bool {
+func (r Record[V]) IsExpired() bool {
 	if r.ExpireAt == nil {
 		return false
 	}
