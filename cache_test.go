@@ -233,3 +233,37 @@ func TestCache_Flush(t *testing.T) {
 		require.Empty(t, store)
 	})
 }
+
+func TestCache_Length(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the length of the cache", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		c, _ := memcache.New[int, string](ctx)
+		store := c.GetStore()
+		store[1] = record.Record[string]{Value: "a"}
+		store[2] = record.Record[string]{Value: "b"}
+		store[3] = record.Record[string]{Value: "c"}
+
+		require.Equal(t, 3, c.Length())
+	})
+}
+
+func TestCache_Keys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the keys of the cache", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		c, _ := memcache.New[int, string](ctx)
+		store := c.GetStore()
+		store[1] = record.Record[string]{Value: "a"}
+		store[2] = record.Record[string]{Value: "b"}
+		store[3] = record.Record[string]{Value: "c"}
+
+		require.ElementsMatch(t, []int{1, 2, 3}, c.Keys())
+	})
+}

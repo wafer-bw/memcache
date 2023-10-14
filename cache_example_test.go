@@ -123,3 +123,11 @@ func ExampleCache_Flush() {
 	// false
 	// false
 }
+
+func ExampleCache_Length() {
+	// TODO: this
+}
+
+func ExampleCache_Keys() {
+	// TODO: this
+}

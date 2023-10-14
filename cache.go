@@ -88,6 +88,25 @@ func (c *Cache[K, V]) Flush() {
 	clear(c.store)
 }
 
+func (c *Cache[K, V]) Length() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.store)
+}
+
+func (c *Cache[K, V]) Keys() []K {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]K, 0, len(c.store))
+	for k := range c.store {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
 type CacheConfig struct {
 	expireOnGet        bool
 	expirationInterval time.Duration
