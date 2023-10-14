@@ -63,12 +63,9 @@ func (c *Cache[K, V]) Set(key K, value V, options ...ValueConfigOption) {
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
 	r, ok := c.store[key]
-	if !ok {
-		return r.Value, ok
-	}
 	c.mu.RUnlock()
 
-	if c.expireOnGet && r.IsExpired() {
+	if ok && c.expireOnGet && r.IsExpired() {
 		c.Delete(key)
 		var v V
 		return v, false
