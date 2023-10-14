@@ -34,15 +34,6 @@ func New[K comparable, V any](options ...CacheConfigOption) (*Cache[K, V], error
 	}, nil
 }
 
-func (c *Cache[K, V]) Get(key K) (V, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	r, ok := c.store[key]
-
-	return r.Value, ok
-}
-
 func (c *Cache[K, V]) Set(key K, value V, options ...ValueConfigOption) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -59,6 +50,15 @@ func (c *Cache[K, V]) Set(key K, value V, options ...ValueConfigOption) {
 		Value:    value,
 		ExpireAt: valueConfig.expireAt,
 	}
+}
+
+func (c *Cache[K, V]) Get(key K) (V, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	r, ok := c.store[key]
+
+	return r.Value, ok
 }
 
 func (c *Cache[K, V]) Delete(key K) {

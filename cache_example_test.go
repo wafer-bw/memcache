@@ -69,3 +69,40 @@ func ExampleCache_Get_keyNotFound() {
 	// Output:
 	// false
 }
+
+func ExampleCache_Delete() {
+	cache, err := memcache.New[int, string]()
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+
+	cache.Delete(1)
+
+	_, ok := cache.Get(1)
+	fmt.Println(ok)
+	// Output:
+	// false
+}
+
+func ExampleCache_Flush() {
+	cache, err := memcache.New[int, string]()
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+	cache.Set(2, "two")
+
+	cache.Flush()
+
+	_, ok := cache.Get(1)
+	fmt.Println(ok)
+
+	_, ok = cache.Get(2)
+	fmt.Println(ok)
+	// Output:
+	// false
+	// false
+}
