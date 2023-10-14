@@ -8,11 +8,16 @@ import (
 	"github.com/wafer-bw/memcache/internal/record"
 )
 
+type expirer[K comparable, V any] interface {
+	Expire(cache *Cache[K, V])
+}
+
 type Cache[K comparable, V any] struct {
 	mu                 sync.RWMutex
 	store              map[K]record.Record[V]
 	expireOnGet        bool
 	expirationInterval time.Duration
+	expirer            expirer[K, V]
 
 	// TODO: add eviction support.
 }
@@ -33,10 +38,11 @@ func New[K comparable, V any](ctx context.Context, options ...CacheConfigOption)
 		store:              map[K]record.Record[V]{},
 		expireOnGet:        config.expireOnGet,
 		expirationInterval: config.expirationInterval,
+		expirer:            &fullScanExpirer[K, V]{},
 	}
 
 	if cache.expirationInterval > 0 {
-		go cache.expirer(ctx)
+		go cache.runExpirer(ctx)
 	}
 
 	return cache, nil
@@ -141,7 +147,7 @@ func WithTTL(d time.Duration) ValueConfigOption {
 	}
 }
 
-func (c *Cache[K, V]) expirer(ctx context.Context) {
+func (c *Cache[K, V]) runExpirer(ctx context.Context) {
 	// TODO: add unit tests for this.
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
@@ -151,15 +157,7 @@ func (c *Cache[K, V]) expirer(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			c.mu.Lock()
-			// TODO: employ a more efficient algorithm for expiring records.
-			// https://redis.io/commands/expire/#:~:text=How%20Redis%20expires%20keys
-			for k, r := range c.store {
-				if r.IsExpired() {
-					delete(c.store, k)
-				}
-			}
-			c.mu.Unlock()
+			c.expirer.Expire(c)
 		}
 	}
 }
