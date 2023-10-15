@@ -40,17 +40,17 @@ func (c *Cache[K, V]) Set(key K, value V, options ...RecordConfigOption) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	valueConfig := RecordConfig{}
+	recordConfig := RecordConfig{}
 	for _, option := range options {
 		if option == nil {
 			continue
 		}
-		option(&valueConfig)
+		option(&recordConfig)
 	}
 
 	c.store[key] = record.Record[V]{
 		Value:    value,
-		ExpireAt: valueConfig.expireAt,
+		ExpireAt: recordConfig.expireAt,
 	}
 }
 
