@@ -22,7 +22,7 @@ func ExampleNew() {
 func ExampleNew_withPassiveExpirationEnabled() {
 	ctx := context.TODO()
 
-	cache, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration())
+	cache, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
 	if err != nil {
 		panic(err)
 	}

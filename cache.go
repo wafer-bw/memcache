@@ -7,39 +7,28 @@ import (
 	"github.com/wafer-bw/memcache/internal/record"
 )
 
-// TODO: decide how to handle options that need generics such as:
-// WithExpirer[K, V]
-// WithEvicter[K, V]
+// TODO: decide how to handle item options that need generics such as:
 // WithOnEvict[K, V]
-//
-// The base cache options can reasonably be generic but the record options
-// are likely best left as concrete types. This would mean controlling records
-// generically must be done on separate cache methods.
 
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
 	store             map[K]record.Record[V]
 	passiveExpiration bool
-
-	// TODO: add active expiration support.
-	// TODO: add active eviction support.
 }
 
-func New[K comparable, V any](ctx context.Context, options ...CacheConfigOption) (*Cache[K, V], error) {
-	config := CacheConfig{}
+func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V]) (*Cache[K, V], error) {
+	cache := &Cache[K, V]{
+		mu:    sync.RWMutex{},
+		store: map[K]record.Record[V]{},
+	}
+
 	for _, option := range options {
 		if option == nil {
 			continue
 		}
-		if err := option(&config); err != nil {
+		if err := option(cache); err != nil {
 			return nil, err
 		}
-	}
-
-	cache := &Cache[K, V]{
-		mu:                sync.RWMutex{},
-		store:             map[K]record.Record[V]{},
-		passiveExpiration: config.passiveExpiration,
 	}
 
 	return cache, nil

@@ -38,7 +38,7 @@ func TestNew(t *testing.T) {
 		ctx := context.Background()
 
 		var errDummy error = errors.New("dummy")
-		c, err := memcache.New[int, string](ctx, func(c *memcache.CacheConfig) error { return errDummy })
+		c, err := memcache.New[int, string](ctx, func(c *memcache.Cache[int, string]) error { return errDummy })
 		require.ErrorIs(t, err, errDummy)
 		require.Nil(t, c)
 	})
@@ -47,7 +47,7 @@ func TestNew(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
-		c, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration())
+		c, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
 		require.NoError(t, err)
 		require.True(t, c.GetExpireOnGet())
 	})
@@ -81,7 +81,7 @@ func TestCache_Get(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration())
+		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
 		c.Set(1, "a", memcache.WithTTL(0*time.Second))
 		got, ok := c.Get(1)
 		require.False(t, ok)
@@ -124,7 +124,7 @@ func TestCache_Has(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration())
+		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
 		c.Set(1, "a", memcache.WithTTL(0*time.Second))
 		require.False(t, c.Has(1))
 	})
