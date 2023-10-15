@@ -19,7 +19,7 @@ func ExampleNew() {
 	_ = cache
 }
 
-func ExampleNew_withPassiveExpiration() {
+func ExampleNew_withPassiveExpirationEnabled() {
 	ctx := context.TODO()
 
 	cache, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration())
@@ -64,12 +64,15 @@ func ExampleCache_Get() {
 	v, ok := cache.Get(1)
 	fmt.Println(v)
 	fmt.Println(ok)
+	_, ok = cache.Get(2)
+	fmt.Println(ok)
 	// Output:
 	// one
 	// true
+	// false
 }
 
-func ExampleCache_Get_keyNotFound() {
+func ExampleCache_Has() {
 	ctx := context.TODO()
 
 	cache, err := memcache.New[int, string](ctx)
@@ -77,9 +80,12 @@ func ExampleCache_Get_keyNotFound() {
 		panic(err)
 	}
 
-	_, ok := cache.Get(1)
-	fmt.Println(ok)
+	cache.Set(1, "one")
+
+	fmt.Println(cache.Has(1))
+	fmt.Println(cache.Has(2))
 	// Output:
+	// true
 	// false
 }
 
@@ -157,21 +163,4 @@ func ExampleCache_Keys() {
 	// Unordered output:
 	// 1
 	// 2
-}
-
-func ExampleCache_Has() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	cache.Set(1, "one")
-
-	fmt.Println(cache.Has(1))
-	fmt.Println(cache.Has(2))
-	// Output:
-	// true
-	// false
 }

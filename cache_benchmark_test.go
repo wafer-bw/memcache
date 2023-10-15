@@ -48,6 +48,26 @@ func BenchmarkCache_Get(b *testing.B) {
 	}
 }
 
+func BenchmarkCache_Has(b *testing.B) {
+	ctx := context.Background()
+
+	for _, n := range []int{100, 1000, 10000, 100000} {
+		cache, err := memcache.New[int, int](ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+		for i := 0; i < n; i++ {
+			cache.Set(i, i)
+		}
+
+		b.Run(fmt.Sprintf("has key with %d keys", n), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_ = cache.Has(i % n)
+			}
+		})
+	}
+}
+
 func BenchmarkCache_Delete(b *testing.B) {
 	ctx := context.Background()
 
@@ -83,6 +103,46 @@ func BenchmarkCache_Flush(b *testing.B) {
 		b.Run(fmt.Sprintf("flush cache with %d keys", n), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				cache.Flush()
+			}
+		})
+	}
+}
+
+func BenchmarkCache_Length(b *testing.B) {
+	ctx := context.Background()
+
+	for _, n := range []int{100, 1000, 10000, 100000} {
+		cache, err := memcache.New[int, int](ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+		for i := 0; i < n; i++ {
+			cache.Set(i, i)
+		}
+
+		b.Run(fmt.Sprintf("length with %d keys", n), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_ = cache.Length()
+			}
+		})
+	}
+}
+
+func BenchmarkCache_Keys(b *testing.B) {
+	ctx := context.Background()
+
+	for _, n := range []int{100, 1000, 10000, 100000} {
+		cache, err := memcache.New[int, int](ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+		for i := 0; i < n; i++ {
+			cache.Set(i, i)
+		}
+
+		b.Run(fmt.Sprintf("keys with %d keys", n), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				_ = cache.Keys()
 			}
 		})
 	}
