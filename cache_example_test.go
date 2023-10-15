@@ -130,7 +130,7 @@ func ExampleCache_Flush() {
 	// false
 }
 
-func ExampleCache_Length() {
+func ExampleCache_Size() {
 	ctx := context.TODO()
 
 	cache, err := memcache.New[int, string](ctx)
@@ -141,7 +141,7 @@ func ExampleCache_Length() {
 	cache.Set(1, "one")
 	cache.Set(2, "two")
 
-	fmt.Println(cache.Length())
+	fmt.Println(cache.Size())
 	// Output:
 	// 2
 }

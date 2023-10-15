@@ -206,14 +206,14 @@ func TestCache_Flush(t *testing.T) {
 
 		c.Flush()
 
-		require.Equal(t, 0, c.Length())
+		require.Equal(t, 0, c.Size())
 	})
 }
 
-func TestCache_Length(t *testing.T) {
+func TestCache_Size(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns the length of the cache", func(t *testing.T) {
+	t.Run("returns the size of the cache", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
@@ -221,7 +221,7 @@ func TestCache_Length(t *testing.T) {
 		c.Set(1, "a")
 		c.Set(2, "b")
 		c.Set(3, "c")
-		require.Equal(t, 3, c.Length())
+		require.Equal(t, 3, c.Size())
 	})
 }
 

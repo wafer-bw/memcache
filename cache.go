@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/wafer-bw/memcache/internal/record"
+	"github.com/wafer-bw/memcache/internal/item"
 )
 
 // TODO: decide how to handle item options that need generics such as:
@@ -12,14 +12,14 @@ import (
 
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
-	store             map[K]record.Record[V]
+	store             map[K]item.Item[V]
 	passiveExpiration bool
 }
 
 func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:    sync.RWMutex{},
-		store: map[K]record.Record[V]{},
+		store: map[K]item.Item[V]{},
 	}
 
 	for _, option := range options {
@@ -34,11 +34,11 @@ func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V])
 	return cache, nil
 }
 
-func (c *Cache[K, V]) Set(key K, value V, options ...RecordConfigOption) {
+func (c *Cache[K, V]) Set(key K, value V, options ...ItemOption) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	recordConfig := RecordConfig{}
+	recordConfig := ItemConfig{}
 	for _, option := range options {
 		if option == nil {
 			continue
@@ -46,7 +46,7 @@ func (c *Cache[K, V]) Set(key K, value V, options ...RecordConfigOption) {
 		option(&recordConfig)
 	}
 
-	c.store[key] = record.Record[V]{
+	c.store[key] = item.Item[V]{
 		Value:    value,
 		ExpireAt: recordConfig.expireAt,
 	}
@@ -85,9 +85,7 @@ func (c *Cache[K, V]) Flush() {
 	clear(c.store)
 }
 
-func (c *Cache[K, V]) Length() int {
-	// TODO: rename to Size().
-
+func (c *Cache[K, V]) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

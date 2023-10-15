@@ -1,13 +1,13 @@
-package record
+package item
 
 import "time"
 
-type Record[V any] struct {
+type Item[V any] struct {
 	Value    V
 	ExpireAt *time.Time
 }
 
-func (r Record[V]) IsExpired() bool {
+func (r Item[V]) IsExpired() bool {
 	if r.ExpireAt == nil {
 		return false
 	}

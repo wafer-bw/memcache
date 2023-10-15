@@ -108,7 +108,7 @@ func BenchmarkCache_Flush(b *testing.B) {
 	}
 }
 
-func BenchmarkCache_Length(b *testing.B) {
+func BenchmarkCache_Size(b *testing.B) {
 	ctx := context.Background()
 
 	for _, n := range []int{100, 1000, 10000, 100000} {
@@ -120,9 +120,9 @@ func BenchmarkCache_Length(b *testing.B) {
 			cache.Set(i, i)
 		}
 
-		b.Run(fmt.Sprintf("length with %d keys", n), func(b *testing.B) {
+		b.Run(fmt.Sprintf("size with %d keys", n), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_ = cache.Length()
+				_ = cache.Size()
 			}
 		})
 	}

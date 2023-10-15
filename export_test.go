@@ -1,7 +1,7 @@
 package memcache
 
 import (
-	"github.com/wafer-bw/memcache/internal/record"
+	"github.com/wafer-bw/memcache/internal/item"
 )
 
 // UnlockFunc unlockes the mutex for the cache store.
@@ -10,7 +10,7 @@ import (
 type UnlockFunc func()
 
 // export for testing.
-func (c *Cache[K, V]) GetStore() (map[K]record.Record[V], UnlockFunc) {
+func (c *Cache[K, V]) GetStore() (map[K]item.Item[V], UnlockFunc) {
 	c.mu.Lock()
 
 	return c.store, c.mu.Unlock
