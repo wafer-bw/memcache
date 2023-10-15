@@ -3,19 +3,17 @@ package memcache
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/wafer-bw/memcache/internal/record"
 )
 
 type Cache[K comparable, V any] struct {
-	mu                 sync.RWMutex
-	store              map[K]record.Record[V]
-	expireOnGet        bool
-	expirationInterval time.Duration
-	expirer            expirer[K, V]
+	mu                sync.RWMutex
+	store             map[K]record.Record[V]
+	passiveExpiration bool
 
-	// TODO: add eviction support.
+	// TODO: add active expiration support.
+	// TODO: add active eviction support.
 }
 
 func New[K comparable, V any](ctx context.Context, options ...CacheConfigOption) (*Cache[K, V], error) {
@@ -30,25 +28,19 @@ func New[K comparable, V any](ctx context.Context, options ...CacheConfigOption)
 	}
 
 	cache := &Cache[K, V]{
-		mu:                 sync.RWMutex{},
-		store:              map[K]record.Record[V]{},
-		expireOnGet:        config.expireOnGet,
-		expirationInterval: config.expirationInterval,
-		expirer:            expirerFunc[K, V](fullScanExpirer[K, V]),
-	}
-
-	if cache.expirationInterval > 0 {
-		go cache.runExpirer(ctx)
+		mu:                sync.RWMutex{},
+		store:             map[K]record.Record[V]{},
+		passiveExpiration: config.passiveExpiration,
 	}
 
 	return cache, nil
 }
 
-func (c *Cache[K, V]) Set(key K, value V, options ...ValueConfigOption) {
+func (c *Cache[K, V]) Set(key K, value V, options ...RecordConfigOption) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	valueConfig := ValueConfig{}
+	valueConfig := RecordConfig{}
 	for _, option := range options {
 		if option == nil {
 			continue
@@ -67,7 +59,7 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	r, ok := c.store[key]
 	c.mu.RUnlock()
 
-	if ok && c.expireOnGet && r.IsExpired() {
+	if ok && c.passiveExpiration && r.IsExpired() {
 		c.Delete(key)
 		var v V
 		return v, false
@@ -112,55 +104,4 @@ func (c *Cache[K, V]) Keys() []K {
 	}
 
 	return keys
-}
-
-type CacheConfig struct {
-	expireOnGet        bool
-	expirationInterval time.Duration
-}
-
-type CacheConfigOption func(*CacheConfig) error
-
-func WithExpireOnGet() CacheConfigOption {
-	return func(config *CacheConfig) error {
-		config.expireOnGet = true
-		return nil
-	}
-}
-
-func WithExpirationInterval(i time.Duration) CacheConfigOption {
-	return func(config *CacheConfig) error {
-		config.expirationInterval = i
-		return nil
-	}
-}
-
-type ValueConfig struct {
-	expireAt *time.Time
-}
-
-type ValueConfigOption func(*ValueConfig)
-
-func WithTTL(d time.Duration) ValueConfigOption {
-	return func(config *ValueConfig) {
-		expireAt := time.Now().Add(d)
-		config.expireAt = &expireAt
-	}
-}
-
-func (c *Cache[K, V]) runExpirer(ctx context.Context) {
-	ticker := time.NewTicker(c.expirationInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			// TODO: this allows the context to be closed/cancelled but does not
-			//       stop the cache from being used. Should consider a solution
-			//       to this problem.
-			return
-		case <-ticker.C:
-			c.expirer.Expire(c)
-		}
-	}
 }

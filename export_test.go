@@ -1,34 +1,22 @@
 package memcache
 
 import (
-	"context"
-	"sync"
-	"time"
-
 	"github.com/wafer-bw/memcache/internal/record"
 )
 
+// UnlockFunc unlockes the mutex for the cache store.
+//
 // export for testing.
-func (c *Cache[K, V]) GetStore() map[K]record.Record[V] {
-	return c.store
-}
+type UnlockFunc func()
 
 // export for testing.
-func (c *Cache[K, V]) GetMutex() *sync.RWMutex {
-	return &c.mu
-}
+func (c *Cache[K, V]) GetStore() (map[K]record.Record[V], UnlockFunc) {
+	c.mu.Lock()
 
-// export for testing.
-func (c *Cache[K, V]) GetExpirationInterval() time.Duration {
-	return c.expirationInterval
+	return c.store, c.mu.Unlock
 }
 
 // export for testing.
 func (c *Cache[K, V]) GetExpireOnGet() bool {
-	return c.expireOnGet
-}
-
-// export for testing.
-func (c *Cache[K, V]) RunExpirer(ctx context.Context) {
-	c.runExpirer(ctx)
+	return c.passiveExpiration
 }

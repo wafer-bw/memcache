@@ -19,10 +19,10 @@ func ExampleNew() {
 	_ = cache
 }
 
-func ExampleNew_withExpirationInterval() {
+func ExampleNew_withPassiveExpiration() {
 	ctx := context.TODO()
 
-	cache, err := memcache.New[int, string](ctx, memcache.WithExpirationInterval(1*time.Minute))
+	cache, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration())
 	if err != nil {
 		panic(err)
 	}
