@@ -1,2 +1,2 @@
 # memcache
-Go in-memory cache
+Generic in-memory key-value cache.

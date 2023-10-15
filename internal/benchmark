@@ -1,0 +1,3 @@
+#!/bin/sh
+
+go test -run=- -benchmem -bench . github.com/wafer-bw/memcache
