@@ -104,7 +104,7 @@ func TestCache_Get(t *testing.T) {
 		require.Equal(t, v, got)
 	})
 
-	t.Run("returns false when value does not exist in the cache", func(t *testing.T) {
+	t.Run("returns false when key does not exist in the cache", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
@@ -114,7 +114,7 @@ func TestCache_Get(t *testing.T) {
 		require.False(t, ok)
 	})
 
-	t.Run("expires stale values when expire on get is on", func(t *testing.T) {
+	t.Run("deletes expired values when expire on get is on", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
@@ -128,7 +128,7 @@ func TestCache_Get(t *testing.T) {
 		require.False(t, ok)
 	})
 
-	t.Run("does not expire stale values when expire on get is off", func(t *testing.T) {
+	t.Run("does not delete expired values when expire on get is off", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
@@ -140,6 +140,57 @@ func TestCache_Get(t *testing.T) {
 
 		_, ok := c.Get(k)
 		require.True(t, ok)
+	})
+}
+
+func TestCache_Has(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns true if key exists in the cache", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		k, v := 1, "a"
+		c, _ := memcache.New[int, string](ctx)
+		store := c.GetStore()
+		store[k] = record.Record[string]{Value: v}
+
+		require.True(t, c.Has(k))
+	})
+
+	t.Run("returns false when key does not exist in the cache", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		c, _ := memcache.New[int, string](ctx)
+
+		require.False(t, c.Has(1))
+	})
+
+	t.Run("deletes expired values when expire on get is on", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		now := time.Now()
+		k, v := 1, "a"
+		c, _ := memcache.New[int, string](ctx, memcache.WithExpireOnGet())
+		store := c.GetStore()
+		store[k] = record.Record[string]{Value: v, ExpireAt: &now}
+
+		require.False(t, c.Has(k))
+	})
+
+	t.Run("does not delete expired values when expire on get is off", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+
+		now := time.Now()
+		k, v := 1, "a"
+		c, _ := memcache.New[int, string](ctx)
+		store := c.GetStore()
+		store[k] = record.Record[string]{Value: v, ExpireAt: &now}
+
+		require.True(t, c.Has(k))
 	})
 }
 
@@ -271,5 +322,19 @@ func TestCache_Keys(t *testing.T) {
 func TestCache_RunExpirer(t *testing.T) {
 	t.Parallel()
 
-	// TODO: this
+	t.Run("runs expirer", func(t *testing.T) {
+		t.Parallel()
+		ctx := context.Background()
+		now := time.Now()
+
+		c, err := memcache.New[int, int](ctx, memcache.WithExpirationInterval(1*time.Millisecond))
+		require.NoError(t, err)
+		store := c.GetStore()
+
+		store[1] = record.Record[int]{Value: 1, ExpireAt: &now}
+
+		time.Sleep(2 * time.Millisecond)
+		require.NotContains(t, store, 1)
+
+	})
 }

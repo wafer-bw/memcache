@@ -125,9 +125,53 @@ func ExampleCache_Flush() {
 }
 
 func ExampleCache_Length() {
-	// TODO: this
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+	cache.Set(2, "two")
+
+	fmt.Println(cache.Length())
+	// Output:
+	// 2
 }
 
 func ExampleCache_Keys() {
-	// TODO: this
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+	cache.Set(2, "two")
+
+	for _, key := range cache.Keys() {
+		fmt.Println(key)
+	}
+	// Unordered output:
+	// 1
+	// 2
+}
+
+func ExampleCache_Has() {
+	ctx := context.TODO()
+
+	cache, err := memcache.New[int, string](ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+
+	fmt.Println(cache.Has(1))
+	fmt.Println(cache.Has(2))
+	// Output:
+	// true
+	// false
 }

@@ -76,6 +76,11 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	return r.Value, ok
 }
 
+func (c *Cache[K, V]) Has(key K) bool {
+	_, ok := c.Get(key)
+	return ok
+}
+
 func (c *Cache[K, V]) Delete(key K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -144,13 +149,15 @@ func WithTTL(d time.Duration) ValueConfigOption {
 }
 
 func (c *Cache[K, V]) runExpirer(ctx context.Context) {
-	// TODO: add unit tests for this.
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
+			// TODO: this allows the context to be closed/cancelled but does not
+			//       stop the cache from being used. Should consider a solution
+			//       to this problem.
 			return
 		case <-ticker.C:
 			c.expirer.Expire(c)
