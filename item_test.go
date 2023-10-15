@@ -8,7 +8,7 @@ import (
 	"github.com/wafer-bw/memcache"
 )
 
-func TestRecord_IsExpired(t *testing.T) {
+func TestItem_IsExpired(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns false when ExpireAt is nil", func(t *testing.T) {
