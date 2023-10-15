@@ -6,11 +6,11 @@ type ItemConfig struct {
 	expireAt *time.Time
 }
 
-type ItemOption func(*ItemConfig)
+type ItemConfigOption func(*ItemConfig)
 
-func WithTTL(d time.Duration) ItemOption {
-	return func(config *ItemConfig) {
+func WithTTL(d time.Duration) ItemConfigOption {
+	return func(itemConfig *ItemConfig) {
 		expireAt := time.Now().Add(d)
-		config.expireAt = &expireAt
+		itemConfig.expireAt = &expireAt
 	}
 }

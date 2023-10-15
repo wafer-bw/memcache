@@ -5,9 +5,6 @@ import (
 	"sync"
 )
 
-// TODO: decide how to handle item options that need generics such as:
-// WithOnEvict[K, V]
-
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
 	store             map[K]Item[V]
@@ -32,7 +29,7 @@ func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V])
 	return cache, nil
 }
 
-func (c *Cache[K, V]) Set(key K, value V, options ...ItemOption) {
+func (c *Cache[K, V]) Set(key K, value V, options ...ItemConfigOption) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
