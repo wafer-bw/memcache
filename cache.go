@@ -7,6 +7,15 @@ import (
 	"github.com/wafer-bw/memcache/internal/record"
 )
 
+// TODO: decide how to handle options that need generics such as:
+// WithExpirer[K, V]
+// WithEvicter[K, V]
+// WithOnEvict[K, V]
+//
+// The base cache options can reasonably be generic but the record options
+// are likely best left as concrete types. This would mean controlling records
+// generically must be done on separate cache methods.
+
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
 	store             map[K]record.Record[V]
@@ -88,11 +97,15 @@ func (c *Cache[K, V]) Flush() {
 }
 
 func (c *Cache[K, V]) Length() int {
+	// TODO: rename to Size().
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return len(c.store)
 }
+
+// TODO: add SizeBytes() that returns the size of the cache in bytes.
 
 func (c *Cache[K, V]) Keys() []K {
 	c.mu.RLock()
@@ -105,3 +118,5 @@ func (c *Cache[K, V]) Keys() []K {
 
 	return keys
 }
+
+// TODO: Add Items() that returns a shallow copy of c.store.
