@@ -3,8 +3,6 @@ package memcache
 import (
 	"context"
 	"sync"
-
-	"github.com/wafer-bw/memcache/internal/item"
 )
 
 // TODO: decide how to handle item options that need generics such as:
@@ -12,14 +10,14 @@ import (
 
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
-	store             map[K]item.Item[V]
+	store             map[K]Item[V]
 	passiveExpiration bool
 }
 
 func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:    sync.RWMutex{},
-		store: map[K]item.Item[V]{},
+		store: map[K]Item[V]{},
 	}
 
 	for _, option := range options {
@@ -46,7 +44,7 @@ func (c *Cache[K, V]) Set(key K, value V, options ...ItemOption) {
 		option(&recordConfig)
 	}
 
-	c.store[key] = item.Item[V]{
+	c.store[key] = Item[V]{
 		Value:    value,
 		ExpireAt: recordConfig.expireAt,
 	}

@@ -1,4 +1,4 @@
-package item
+package memcache
 
 import "time"
 
