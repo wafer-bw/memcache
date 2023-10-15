@@ -8,10 +8,6 @@ import (
 	"github.com/wafer-bw/memcache/internal/record"
 )
 
-type expirer[K comparable, V any] interface {
-	Expire(cache *Cache[K, V])
-}
-
 type Cache[K comparable, V any] struct {
 	mu                 sync.RWMutex
 	store              map[K]record.Record[V]
@@ -38,7 +34,7 @@ func New[K comparable, V any](ctx context.Context, options ...CacheConfigOption)
 		store:              map[K]record.Record[V]{},
 		expireOnGet:        config.expireOnGet,
 		expirationInterval: config.expirationInterval,
-		expirer:            &fullScanExpirer[K, V]{},
+		expirer:            expirerFunc[K, V](fullScanExpirer[K, V]),
 	}
 
 	if cache.expirationInterval > 0 {

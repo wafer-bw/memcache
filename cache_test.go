@@ -267,3 +267,9 @@ func TestCache_Keys(t *testing.T) {
 		require.ElementsMatch(t, []int{1, 2, 3}, c.Keys())
 	})
 }
+
+func TestCache_RunExpirer(t *testing.T) {
+	t.Parallel()
+
+	// TODO: this
+}

@@ -1,6 +1,7 @@
 package memcache
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -25,4 +26,9 @@ func (c *Cache[K, V]) GetExpirationInterval() time.Duration {
 // export for testing.
 func (c *Cache[K, V]) GetExpireOnGet() bool {
 	return c.expireOnGet
+}
+
+// export for testing.
+func (c *Cache[K, V]) RunExpirer(ctx context.Context) {
+	c.runExpirer(ctx)
 }
