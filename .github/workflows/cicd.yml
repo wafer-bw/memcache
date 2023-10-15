@@ -1,0 +1,138 @@
+name: cicd
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  setup:
+    name: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    needs: setup
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - name: Run go generate
+        run: go generate ./... && git diff --exit-code
+      - name: Run go build
+        run: go build -o /dev/null ./...
+
+  clean:
+    name: clean
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    needs: setup
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - name: Run go mod tidy
+        run: go mod tidy && git diff --exit-code
+      - name: Run go mod verify
+        run: go mod verify
+      - name: Run formatting
+        run: go run golang.org/x/tools/cmd/goimports@latest -w . && git diff --exit-code
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    needs: setup
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - name: Run linting
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    needs: setup
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - name: Run tests
+        run: go test -shuffle=on -v -count=1 -race -failfast -timeout=30s -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Coverage
+        uses: codecov/codecov-action@v3
+
+  benchmark:
+    name: benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    needs: setup
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+      - name: Run benchmarks
+        run: go test -run=- -benchmem -bench . github.com/wafer-bw/memcache/...
