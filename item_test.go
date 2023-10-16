@@ -14,23 +14,23 @@ func TestItem_IsExpired(t *testing.T) {
 	t.Run("returns false when ExpireAt is nil", func(t *testing.T) {
 		t.Parallel()
 
-		var r memcache.Item[string]
-		require.False(t, r.IsExpired())
+		var i memcache.Item[int, string]
+		require.False(t, i.IsExpired())
 	})
 
 	t.Run("returns false when ExpireAt is in the future", func(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now().Add(1 * time.Minute)
-		r := memcache.Item[string]{ExpireAt: &now}
-		require.False(t, r.IsExpired())
+		i := memcache.Item[int, string]{ExpireAt: &now}
+		require.False(t, i.IsExpired())
 	})
 
 	t.Run("returns true when ExpireAt is in the past", func(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now().Add(-1 * time.Minute)
-		r := memcache.Item[string]{ExpireAt: &now}
-		require.True(t, r.IsExpired())
+		i := memcache.Item[int, string]{ExpireAt: &now}
+		require.True(t, i.IsExpired())
 	})
 }

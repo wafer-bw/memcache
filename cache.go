@@ -7,14 +7,14 @@ import (
 
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
-	store             map[K]Item[V]
+	store             map[K]Item[K, V]
 	passiveExpiration bool
 }
 
 func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:    sync.RWMutex{},
-		store: map[K]Item[V]{},
+		store: map[K]Item[K, V]{},
 	}
 
 	for _, option := range options {
@@ -29,22 +29,20 @@ func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V])
 	return cache, nil
 }
 
-func (c *Cache[K, V]) Set(key K, value V, options ...ItemConfigOption) {
+func (c *Cache[K, V]) Set(key K, value V, options ...ItemOption[K, V]) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	itemConfig := ItemConfig{}
+	item := Item[K, V]{Value: value}
+
 	for _, option := range options {
 		if option == nil {
 			continue
 		}
-		option(&itemConfig)
+		option(&item)
 	}
 
-	c.store[key] = Item[V]{
-		Value:    value,
-		ExpireAt: itemConfig.expireAt,
-	}
+	c.store[key] = item
 }
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
@@ -87,8 +85,6 @@ func (c *Cache[K, V]) Size() int {
 	return len(c.store)
 }
 
-// TODO: add SizeBytes() that returns the size of the cache in bytes.
-
 func (c *Cache[K, V]) Keys() []K {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -101,4 +97,6 @@ func (c *Cache[K, V]) Keys() []K {
 	return keys
 }
 
-// TODO: Add Items() that returns a shallow copy of c.store.
+// TODO: Add Items() that returns a shallow copy of c.store?
+//       Naming may need to distinguish from a potential method that
+//       gives access to the real c.store.

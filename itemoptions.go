@@ -2,15 +2,13 @@ package memcache
 
 import "time"
 
-type ItemConfig struct {
-	expireAt *time.Time
-}
+type ItemOption[K comparable, V any] func(*Item[K, V])
 
-type ItemConfigOption func(*ItemConfig)
-
-func WithTTL(d time.Duration) ItemConfigOption {
-	return func(itemConfig *ItemConfig) {
+func WithTTL[K comparable, V any](d time.Duration) ItemOption[K, V] {
+	return func(i *Item[K, V]) {
 		expireAt := time.Now().Add(d)
-		itemConfig.expireAt = &expireAt
+		i.ExpireAt = &expireAt
 	}
 }
+
+// TODO: WithOnEvicted(func(k K, v V) { ... }

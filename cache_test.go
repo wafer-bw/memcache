@@ -82,7 +82,7 @@ func TestCache_Get(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
-		c.Set(1, "a", memcache.WithTTL(0*time.Second))
+		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
 		got, ok := c.Get(1)
 		require.False(t, ok)
 		require.Equal(t, "", got)
@@ -93,7 +93,7 @@ func TestCache_Get(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a", memcache.WithTTL(0*time.Second))
+		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
 		got, ok := c.Get(1)
 		require.True(t, ok)
 		require.Equal(t, "a", got)
@@ -125,7 +125,7 @@ func TestCache_Has(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
-		c.Set(1, "a", memcache.WithTTL(0*time.Second))
+		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
 		require.False(t, c.Has(1))
 	})
 
@@ -134,7 +134,7 @@ func TestCache_Has(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a", memcache.WithTTL(0*time.Second))
+		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
 		require.True(t, c.Has(1))
 	})
 }
@@ -171,7 +171,7 @@ func TestCache_Set(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a", memcache.WithTTL(1*time.Minute))
+		c.Set(1, "a", memcache.WithTTL[int, string](1*time.Minute))
 		store, unlock := c.GetStore()
 		defer unlock()
 		require.NotNil(t, store[1].ExpireAt)
