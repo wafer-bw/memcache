@@ -34,7 +34,7 @@ func ExampleNew_withExpirer() {
 
 	interval := 1 * time.Second
 	expirer := memcache.DeleteAllExpired[int, string]
-	cache, err := memcache.New[int, string](ctx, memcache.WithExpirer[int, string](interval, expirer))
+	cache, err := memcache.New[int, string](ctx, memcache.WithExpirer[int, string](expirer, interval))
 	if err != nil {
 		panic(err)
 	}

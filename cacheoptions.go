@@ -11,8 +11,7 @@ func WithPassiveExpiration[K comparable, V any]() CacheOption[K, V] {
 	}
 }
 
-// TODO: should interval be a separate option?
-func WithExpirer[K comparable, V any](interval time.Duration, f ExpirerFunc[K, V]) CacheOption[K, V] {
+func WithExpirer[K comparable, V any](f ExpirerFunc[K, V], interval time.Duration) CacheOption[K, V] {
 	return func(c *Cache[K, V]) error {
 		if f == nil {
 			return nil // TODO: return error
