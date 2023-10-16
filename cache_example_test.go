@@ -40,7 +40,7 @@ func ExampleCache_Set() {
 	cache.Set(1, "one")
 }
 
-func ExampleCache_Set_withTTL() {
+func ExampleCache_SetEx() {
 	ctx := context.TODO()
 
 	cache, err := memcache.New[int, string](ctx)
@@ -48,7 +48,7 @@ func ExampleCache_Set_withTTL() {
 		panic(err)
 	}
 
-	cache.Set(1, "one", memcache.WithTTL[int, string](1*time.Second))
+	cache.SetEx(1, "one", 1*time.Second)
 }
 
 func ExampleCache_Get() {

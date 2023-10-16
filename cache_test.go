@@ -61,7 +61,10 @@ func TestCache_Get(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a")
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		unlock()
+
 		got, ok := c.Get(1)
 		require.True(t, ok)
 		require.Equal(t, "a", got)
@@ -72,6 +75,7 @@ func TestCache_Get(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
+
 		got, ok := c.Get(1)
 		require.False(t, ok)
 		require.Equal(t, "", got)
@@ -81,8 +85,12 @@ func TestCache_Get(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
+		expireAt := time.Now()
 		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
-		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
+		unlock()
+
 		got, ok := c.Get(1)
 		require.False(t, ok)
 		require.Equal(t, "", got)
@@ -92,8 +100,12 @@ func TestCache_Get(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
+		expireAt := time.Now()
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
+		unlock()
+
 		got, ok := c.Get(1)
 		require.True(t, ok)
 		require.Equal(t, "a", got)
@@ -108,7 +120,10 @@ func TestCache_Has(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a")
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		unlock()
+
 		require.True(t, c.Has(1))
 	})
 
@@ -117,6 +132,7 @@ func TestCache_Has(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
+
 		require.False(t, c.Has(1))
 	})
 
@@ -124,8 +140,12 @@ func TestCache_Has(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
+		expireAt := time.Now()
 		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
-		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
+		unlock()
+
 		require.False(t, c.Has(1))
 	})
 
@@ -133,8 +153,12 @@ func TestCache_Has(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
+		expireAt := time.Now()
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a", memcache.WithTTL[int, string](0*time.Second))
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
+		unlock()
+
 		require.True(t, c.Has(1))
 	})
 }
@@ -146,35 +170,33 @@ func TestCache_Set(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
-		k, v := 1, "a"
 		c, _ := memcache.New[int, string](ctx)
 
-		c.Set(k, v)
+		c.Set(1, "a")
 
-		got, ok := c.Get(k)
-		require.True(t, ok)
-		require.Equal(t, v, got)
+		store, unlock := c.GetStore()
+		defer unlock()
+		require.Contains(t, store, 1)
+		require.Equal(t, "a", store[1].Value)
 	})
+}
 
-	t.Run("does not panic when provided nil options", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-
-		c, _ := memcache.New[int, string](ctx)
-		require.NotPanics(t, func() {
-			c.Set(1, "a", nil, nil)
-		})
-	})
+func TestCache_SetEx(t *testing.T) {
+	t.Parallel()
 
 	t.Run("successfully stores value in the cache with a TTL", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a", memcache.WithTTL[int, string](1*time.Minute))
+
+		c.SetEx(1, "a", 1*time.Minute)
+
 		store, unlock := c.GetStore()
 		defer unlock()
-		require.NotNil(t, store[1].ExpireAt)
+		require.Contains(t, store, 1)
+		require.Equal(t, "a", store[1].Value)
+		require.Greater(t, *store[1].ExpireAt, time.Now())
 	})
 }
 
@@ -186,9 +208,15 @@ func TestCache_Delete(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a")
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		unlock()
+
 		c.Delete(1)
-		require.False(t, c.Has(1))
+
+		store, unlock = c.GetStore()
+		defer unlock()
+		require.NotContains(t, store, 1)
 	})
 }
 
@@ -200,13 +228,17 @@ func TestCache_Flush(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a")
-		c.Set(2, "b")
-		c.Set(3, "c")
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		store[2] = memcache.Item[int, string]{Value: "b"}
+		store[3] = memcache.Item[int, string]{Value: "c"}
+		unlock()
 
 		c.Flush()
 
-		require.Equal(t, 0, c.Size())
+		store, unlock = c.GetStore()
+		defer unlock()
+		require.Empty(t, store)
 	})
 }
 
@@ -218,9 +250,12 @@ func TestCache_Size(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a")
-		c.Set(2, "b")
-		c.Set(3, "c")
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		store[2] = memcache.Item[int, string]{Value: "b"}
+		store[3] = memcache.Item[int, string]{Value: "c"}
+		unlock()
+
 		require.Equal(t, 3, c.Size())
 	})
 }
@@ -233,9 +268,12 @@ func TestCache_Keys(t *testing.T) {
 		ctx := context.Background()
 
 		c, _ := memcache.New[int, string](ctx)
-		c.Set(1, "a")
-		c.Set(2, "b")
-		c.Set(3, "c")
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		store[2] = memcache.Item[int, string]{Value: "b"}
+		store[3] = memcache.Item[int, string]{Value: "c"}
+		unlock()
+
 		require.ElementsMatch(t, []int{1, 2, 3}, c.Keys())
 	})
 }
