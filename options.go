@@ -2,16 +2,16 @@ package memcache
 
 import "time"
 
-type CacheOption[K comparable, V any] func(*Cache[K, V]) error
+type Option[K comparable, V any] func(*Cache[K, V]) error
 
-func WithPassiveExpiration[K comparable, V any]() CacheOption[K, V] {
+func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		c.passiveExpiration = true
 		return nil
 	}
 }
 
-func WithExpirer[K comparable, V any](f ExpirerFunc[K, V], interval time.Duration) CacheOption[K, V] {
+func WithExpirer[K comparable, V any](f ExpirerFunc[K, V], interval time.Duration) Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		if f == nil {
 			return nil // TODO: return error
