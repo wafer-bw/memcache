@@ -12,7 +12,7 @@ type Cache[K comparable, V any] struct {
 	passiveExpiration bool
 }
 
-func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V]) (*Cache[K, V], error) {
+func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:    sync.RWMutex{},
 		store: map[K]Item[K, V]{},
