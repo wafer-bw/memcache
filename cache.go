@@ -37,20 +37,19 @@ func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V])
 	return cache, nil
 }
 
-func (c *Cache[K, V]) Set(key K, value V, options ...ItemOption[K, V]) {
+func (c *Cache[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	item := Item[K, V]{Value: value}
+	c.store[key] = Item[K, V]{Value: value}
+}
 
-	for _, option := range options {
-		if option == nil {
-			continue
-		}
-		option(&item)
-	}
+func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	c.store[key] = item
+	expireAt := time.Now().Add(ttl)
+	c.store[key] = Item[K, V]{Value: value, ExpireAt: &expireAt}
 }
 
 func (c *Cache[K, V]) Get(key K) (V, bool) {
