@@ -29,6 +29,18 @@ func ExampleNew_withPassiveExpirationEnabled() {
 	_ = cache
 }
 
+func ExampleNew_withExpirer() {
+	ctx := context.TODO()
+
+	interval := 1 * time.Second
+	expirer := memcache.DeleteAllExpired[int, string]
+	cache, err := memcache.New[int, string](ctx, memcache.WithExpirer[int, string](interval, expirer))
+	if err != nil {
+		panic(err)
+	}
+	_ = cache
+}
+
 func ExampleCache_Set() {
 	ctx := context.TODO()
 

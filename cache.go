@@ -3,12 +3,16 @@ package memcache
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type Cache[K comparable, V any] struct {
 	mu                sync.RWMutex
 	store             map[K]Item[K, V]
 	passiveExpiration bool
+
+	expirationInterval time.Duration
+	expirer            ExpirerFunc[K, V]
 }
 
 func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V]) (*Cache[K, V], error) {
@@ -24,6 +28,10 @@ func New[K comparable, V any](ctx context.Context, options ...CacheOption[K, V])
 		if err := option(cache); err != nil {
 			return nil, err
 		}
+	}
+
+	if cache.expirer != nil && cache.expirationInterval > 0 {
+		go cache.runExpirer(ctx)
 	}
 
 	return cache, nil
@@ -95,6 +103,25 @@ func (c *Cache[K, V]) Keys() []K {
 	}
 
 	return keys
+}
+
+func (c *Cache[K, V]) runExpirer(ctx context.Context) {
+	ticker := time.NewTicker(c.expirationInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// TODO: this allows the context to be closed/cancelled but does not
+			//       stop the cache from being used. Should consider a solution
+			//       to this problem.
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			c.expirer(c.store)
+			c.mu.Unlock()
+		}
+	}
 }
 
 // TODO: Add Items() that returns a shallow copy of c.store?
