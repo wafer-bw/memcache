@@ -7,14 +7,14 @@ import (
 )
 
 type Cache[K comparable, V any] struct {
-	mu                sync.RWMutex
-	store             map[K]Item[K, V]
-	passiveExpiration bool
-
+	mu                 sync.RWMutex
+	store              map[K]Item[K, V]
+	passiveExpiration  bool
 	expirationInterval time.Duration
 	expirer            ExpirerFunc[K, V]
 }
 
+// New creates an in-memory key-value cache.
 func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:    sync.RWMutex{},
