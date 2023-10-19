@@ -1,7 +1,6 @@
 package memcache_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -15,19 +14,17 @@ func TestNew(t *testing.T) {
 
 	t.Run("returns a new cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, err := memcache.New[int, string](ctx)
+		c, err := memcache.Open[int, string]()
 		require.NoError(t, err)
 		require.NotNil(t, c)
 	})
 
 	t.Run("does not panic when provided nil options", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
 		require.NotPanics(t, func() {
-			c, err := memcache.New[int, string](ctx, nil, nil)
+			c, err := memcache.Open[int, string](nil, nil)
 			require.NoError(t, err)
 			require.NotNil(t, c)
 		})
@@ -35,19 +32,17 @@ func TestNew(t *testing.T) {
 
 	t.Run("returns an error when an option returns an error", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
 		var errDummy error = errors.New("dummy")
-		c, err := memcache.New[int, string](ctx, func(c *memcache.Cache[int, string]) error { return errDummy })
+		c, err := memcache.Open[int, string](func(c *memcache.Cache[int, string]) error { return errDummy })
 		require.ErrorIs(t, err, errDummy)
 		require.Nil(t, c)
 	})
 
 	t.Run("enables passive expiration", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
+		c, err := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
 		require.NoError(t, err)
 		require.True(t, c.GetExpireOnGet())
 	})
@@ -58,9 +53,8 @@ func TestCache_Get(t *testing.T) {
 
 	t.Run("returns value of key & true when key exists in the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a"}
 		unlock()
@@ -72,9 +66,8 @@ func TestCache_Get(t *testing.T) {
 
 	t.Run("returns empty string & false when key does not exist in the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 
 		got, ok := c.Get(1)
 		require.False(t, ok)
@@ -83,10 +76,9 @@ func TestCache_Get(t *testing.T) {
 
 	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
 		expireAt := time.Now()
-		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
+		c, _ := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
 		unlock()
@@ -98,10 +90,9 @@ func TestCache_Get(t *testing.T) {
 
 	t.Run("does not delete expired keys when passive expiration is disabled", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
 		expireAt := time.Now()
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
 		unlock()
@@ -117,9 +108,8 @@ func TestCache_Has(t *testing.T) {
 
 	t.Run("returns true if key exists in the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a"}
 		unlock()
@@ -129,19 +119,17 @@ func TestCache_Has(t *testing.T) {
 
 	t.Run("returns false when key does not exist in the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 
 		require.False(t, c.Has(1))
 	})
 
 	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
 		expireAt := time.Now()
-		c, _ := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
+		c, _ := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
 		unlock()
@@ -151,10 +139,9 @@ func TestCache_Has(t *testing.T) {
 
 	t.Run("does not delete expired keys when passive expiration is disabled", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
 		expireAt := time.Now()
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
 		unlock()
@@ -168,9 +155,8 @@ func TestCache_Set(t *testing.T) {
 
 	t.Run("successfully stores value in the cache at provided key", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 
 		c.Set(1, "a")
 
@@ -186,9 +172,8 @@ func TestCache_SetEx(t *testing.T) {
 
 	t.Run("successfully stores value in the cache with a TTL", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 
 		c.SetEx(1, "a", 1*time.Minute)
 
@@ -205,9 +190,8 @@ func TestCache_Delete(t *testing.T) {
 
 	t.Run("successfully deletes value from the cache at provided key", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a"}
 		unlock()
@@ -225,9 +209,8 @@ func TestCache_Flush(t *testing.T) {
 
 	t.Run("successfully flushes the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a"}
 		store[2] = memcache.Item[int, string]{Value: "b"}
@@ -247,9 +230,8 @@ func TestCache_Size(t *testing.T) {
 
 	t.Run("returns the size of the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a"}
 		store[2] = memcache.Item[int, string]{Value: "b"}
@@ -265,9 +247,8 @@ func TestCache_Keys(t *testing.T) {
 
 	t.Run("returns the keys of the cache", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 
-		c, _ := memcache.New[int, string](ctx)
+		c, _ := memcache.Open[int, string]()
 		store, unlock := c.GetStore()
 		store[1] = memcache.Item[int, string]{Value: "a"}
 		store[2] = memcache.Item[int, string]{Value: "b"}

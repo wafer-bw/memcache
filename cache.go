@@ -1,7 +1,8 @@
 package memcache
 
 import (
-	"context"
+	"fmt"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -12,17 +13,16 @@ type Cache[K comparable, V any] struct {
 	passiveExpiration  bool
 	expirationInterval time.Duration
 	expirer            ExpirerFunc[K, V]
-	closeFn            context.CancelFunc
+	closeCh            chan struct{}
+	closed             bool
 }
 
-// New creates an in-memory key-value cache.
-func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Cache[K, V], error) {
-	ctx, cancel := context.WithCancel(ctx)
-
+// Open a new in-memory key-value cache.
+func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:      sync.RWMutex{},
 		store:   map[K]Item[K, V]{},
-		closeFn: cancel,
+		closeCh: make(chan struct{}),
 	}
 
 	for _, option := range options {
@@ -35,7 +35,10 @@ func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Ca
 	}
 
 	if cache.expirer != nil && cache.expirationInterval > 0 {
-		go cache.runExpirer(ctx)
+		go cache.runExpirer()
+		runtime.SetFinalizer(cache, func(c *Cache[K, V]) {
+			fmt.Println("cgc")
+		})
 	}
 
 	return cache, nil
@@ -108,19 +111,25 @@ func (c *Cache[K, V]) Keys() []K {
 	return keys
 }
 
-// Close stops all of c's goroutines if any are running and should therefore be
-// used when c is no longer needed.
+// Close stops all of the cache's goroutines if any are running and should
+// therefore be called when c is no longer needed.
 func (c *Cache[K, V]) Close() {
-	c.closeFn()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return
+	}
+	c.closed = true
+	close(c.closeCh)
 }
 
-func (c *Cache[K, V]) runExpirer(ctx context.Context) {
+func (c *Cache[K, V]) runExpirer() {
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-c.closeCh:
 			return
 		case <-ticker.C:
 			c.mu.Lock()
