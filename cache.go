@@ -12,13 +12,17 @@ type Cache[K comparable, V any] struct {
 	passiveExpiration  bool
 	expirationInterval time.Duration
 	expirer            ExpirerFunc[K, V]
+	closeFn            context.CancelFunc
 }
 
 // New creates an in-memory key-value cache.
 func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Cache[K, V], error) {
+	ctx, cancel := context.WithCancel(ctx)
+
 	cache := &Cache[K, V]{
-		mu:    sync.RWMutex{},
-		store: map[K]Item[K, V]{},
+		mu:      sync.RWMutex{},
+		store:   map[K]Item[K, V]{},
+		closeFn: cancel,
 	}
 
 	for _, option := range options {
@@ -104,6 +108,12 @@ func (c *Cache[K, V]) Keys() []K {
 	return keys
 }
 
+// Close stops all of c's goroutines if any are running and should therefore be
+// used when c is no longer needed.
+func (c *Cache[K, V]) Close() {
+	c.closeFn()
+}
+
 func (c *Cache[K, V]) runExpirer(ctx context.Context) {
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
@@ -111,9 +121,6 @@ func (c *Cache[K, V]) runExpirer(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			// TODO: this allows the context to be closed/cancelled but does not
-			//       stop the cache from being used. Should consider a solution
-			//       to this problem.
 			return
 		case <-ticker.C:
 			c.mu.Lock()
