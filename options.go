@@ -25,10 +25,6 @@ func WithExpirer[K comparable, V any](f ExpirerFunc[K, V], interval time.Duratio
 	}
 }
 
-// TODO: func WithDefaultExpirer
-
 // TODO: type EvictorFunc
 
 // TODO: func WithEvictor
-
-// TODO: func WithDefaultEvictor
