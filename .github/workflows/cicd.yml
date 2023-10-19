@@ -180,7 +180,4 @@ jobs:
         with:
           header: release
           message: |
-            ```md
             ${{ steps.gorelease.outputs.revision }}
-            ```
-
