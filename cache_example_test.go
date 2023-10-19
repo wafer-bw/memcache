@@ -1,7 +1,6 @@
 package memcache_test
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -10,9 +9,7 @@ import (
 
 // Create a new cache using int keys and string values.
 func ExampleNew() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -20,9 +17,7 @@ func ExampleNew() {
 }
 
 func ExampleNew_withPassiveExpirationEnabled() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx, memcache.WithPassiveExpiration[int, string]())
+	cache, err := memcache.New[int, string](memcache.WithPassiveExpiration[int, string]())
 	if err != nil {
 		panic(err)
 	}
@@ -30,11 +25,9 @@ func ExampleNew_withPassiveExpirationEnabled() {
 }
 
 func ExampleNew_withExpirer() {
-	ctx := context.TODO()
-
 	interval := 1 * time.Second
 	expirer := memcache.DeleteAllExpired[int, string]
-	cache, err := memcache.New[int, string](ctx, memcache.WithExpirer[int, string](expirer, interval))
+	cache, err := memcache.New[int, string](memcache.WithExpirer[int, string](expirer, interval))
 	if err != nil {
 		panic(err)
 	}
@@ -42,9 +35,7 @@ func ExampleNew_withExpirer() {
 }
 
 func ExampleCache_Set() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -53,9 +44,7 @@ func ExampleCache_Set() {
 }
 
 func ExampleCache_SetEx() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -64,9 +53,7 @@ func ExampleCache_SetEx() {
 }
 
 func ExampleCache_Get() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -85,9 +72,7 @@ func ExampleCache_Get() {
 }
 
 func ExampleCache_Has() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -102,9 +87,7 @@ func ExampleCache_Has() {
 }
 
 func ExampleCache_Delete() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -120,9 +103,7 @@ func ExampleCache_Delete() {
 }
 
 func ExampleCache_Flush() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -143,9 +124,7 @@ func ExampleCache_Flush() {
 }
 
 func ExampleCache_Size() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -159,9 +138,7 @@ func ExampleCache_Size() {
 }
 
 func ExampleCache_Keys() {
-	ctx := context.TODO()
-
-	cache, err := memcache.New[int, string](ctx)
+	cache, err := memcache.New[int, string]()
 	if err != nil {
 		panic(err)
 	}

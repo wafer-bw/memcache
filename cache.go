@@ -1,7 +1,8 @@
 package memcache
 
 import (
-	"context"
+	"fmt"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -12,13 +13,16 @@ type Cache[K comparable, V any] struct {
 	passiveExpiration  bool
 	expirationInterval time.Duration
 	expirer            ExpirerFunc[K, V]
+	closeCh            chan struct{}
+	closed             bool
 }
 
 // New creates an in-memory key-value cache.
-func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Cache[K, V], error) {
+func New[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
-		mu:    sync.RWMutex{},
-		store: map[K]Item[K, V]{},
+		mu:      sync.RWMutex{},
+		store:   map[K]Item[K, V]{},
+		closeCh: make(chan struct{}),
 	}
 
 	for _, option := range options {
@@ -31,7 +35,8 @@ func New[K comparable, V any](ctx context.Context, options ...Option[K, V]) (*Ca
 	}
 
 	if cache.expirer != nil && cache.expirationInterval > 0 {
-		go cache.runExpirer(ctx)
+		go cache.runExpirer()
+		runtime.SetFinalizer(cache, func(c *Cache[K, V]) { fmt.Println("gc") })
 	}
 
 	return cache, nil
@@ -104,16 +109,22 @@ func (c *Cache[K, V]) Keys() []K {
 	return keys
 }
 
-func (c *Cache[K, V]) runExpirer(ctx context.Context) {
+// Close stops all of c's goroutines.
+func (c *Cache[K, V]) Close() {
+	if c.closed {
+		return
+	}
+	close(c.closeCh)
+	c.closed = true
+}
+
+func (c *Cache[K, V]) runExpirer() {
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ctx.Done():
-			// TODO: this allows the context to be closed/cancelled but does not
-			//       stop the cache from being used. Should consider a solution
-			//       to this problem.
+		case <-c.closeCh:
 			return
 		case <-ticker.C:
 			c.mu.Lock()

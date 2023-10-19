@@ -1,7 +1,6 @@
 package memcache_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -9,10 +8,8 @@ import (
 )
 
 func BenchmarkCache_Set(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -29,10 +26,8 @@ func BenchmarkCache_Set(b *testing.B) {
 }
 
 func BenchmarkCache_Get(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -49,10 +44,8 @@ func BenchmarkCache_Get(b *testing.B) {
 }
 
 func BenchmarkCache_Has(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -69,10 +62,8 @@ func BenchmarkCache_Has(b *testing.B) {
 }
 
 func BenchmarkCache_Delete(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -89,10 +80,8 @@ func BenchmarkCache_Delete(b *testing.B) {
 }
 
 func BenchmarkCache_Flush(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -109,10 +98,8 @@ func BenchmarkCache_Flush(b *testing.B) {
 }
 
 func BenchmarkCache_Size(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -129,10 +116,8 @@ func BenchmarkCache_Size(b *testing.B) {
 }
 
 func BenchmarkCache_Keys(b *testing.B) {
-	ctx := context.Background()
-
 	for _, n := range []int{100, 1000, 10000, 100000} {
-		cache, err := memcache.New[int, int](ctx)
+		cache, err := memcache.New[int, int]()
 		if err != nil {
 			b.Fatal(err)
 		}
