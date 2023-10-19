@@ -116,9 +116,11 @@ func (c *Cache[K, V]) Keys() []K {
 func (c *Cache[K, V]) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if c.closed {
 		return
 	}
+
 	c.closed = true
 	close(c.closeCh)
 }
