@@ -14,5 +14,15 @@ func (c *Cache[K, V]) GetStore() (map[K]Item[K, V], UnlockFunc) {
 
 // export for testing.
 func (c *Cache[K, V]) GetExpireOnGet() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.passiveExpiration
+}
+
+// export for testing.
+func (c *Cache[K, V]) Closed() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.closed
 }

@@ -258,3 +258,25 @@ func TestCache_Keys(t *testing.T) {
 		require.ElementsMatch(t, []int{1, 2, 3}, c.Keys())
 	})
 }
+
+func TestCache_Close(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successfully closes the cache", func(t *testing.T) {
+		t.Parallel()
+
+		c, _ := memcache.Open[int, string]()
+
+		c.Close()
+		require.True(t, c.Closed())
+	})
+
+	t.Run("subsequent calls to close do not panic", func(t *testing.T) {
+		t.Parallel()
+
+		c, _ := memcache.Open[int, string]()
+
+		c.Close()
+		require.NotPanics(t, func() { c.Close() })
+	})
+}
