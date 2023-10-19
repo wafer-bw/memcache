@@ -1,8 +1,6 @@
 package memcache
 
 import (
-	"fmt"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -36,9 +34,6 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 
 	if cache.expirer != nil && cache.expirationInterval > 0 {
 		go cache.runExpirer()
-		runtime.SetFinalizer(cache, func(c *Cache[K, V]) {
-			fmt.Println("cgc")
-		})
 	}
 
 	return cache, nil
