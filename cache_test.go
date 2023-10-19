@@ -279,4 +279,6 @@ func TestCache_Close(t *testing.T) {
 		c.Close()
 		require.NotPanics(t, func() { c.Close() })
 	})
+
+	// TODO: add test to make sure released cache after close is GC'd
 }
