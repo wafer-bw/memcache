@@ -174,10 +174,13 @@ jobs:
         run: |
           revision=$(go run golang.org/x/exp/cmd/gorelease@latest)
           echo "revision: $revision"
-          echo "revision=$revision" >> $GITHUB_OUTPUT
+          echo "revision<<EOF"$'\n'"$revision"$'\n'EOF >> $GITHUB_OUTPUT
       - name: Comment gorelease outpout
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: release
           message: |
-            Release details: ${{ steps.gorelease.outputs.revision }}
+            ```md
+            ${{ steps.gorelease.outputs.revision }}
+            ```
+
