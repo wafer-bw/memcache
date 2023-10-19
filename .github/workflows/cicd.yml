@@ -176,7 +176,7 @@ jobs:
           echo "::set-output name=revision::$revision"
       - name: Comment gorelease outpout
         uses: marocchino/sticky-pull-request-comment@v2
-          with:
-            header: release
-            message: |
-              ${{ steps.gorelease.outputs.revision }}
+        with:
+          header: release
+          message: |
+            ${{ steps.gorelease.outputs.revision }}
