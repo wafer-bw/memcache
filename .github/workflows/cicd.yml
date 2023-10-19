@@ -179,4 +179,4 @@ jobs:
         with:
           header: release
           message: |
-            ${{ steps.gorelease.outputs.revision }}
+            Release details: ${{ steps.gorelease.outputs.revision }}
