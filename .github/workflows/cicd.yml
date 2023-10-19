@@ -170,6 +170,7 @@ jobs:
       - name: run go mod download & tidy
         run: go mod download && go mod tidy
       - name: run gorelease
+        id: gorelease
         run: |
           revision=$(go run golang.org/x/exp/cmd/gorelease@latest)
           echo "revision: $revision"
