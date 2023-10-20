@@ -6,6 +6,8 @@ import (
 )
 
 type Cache[K comparable, V any] struct {
+	// TODO: docstring
+
 	mu                 sync.RWMutex
 	store              map[K]Item[K, V]
 	passiveExpiration  bool
@@ -39,6 +41,7 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	return cache, nil
 }
 
+// Set permanent key to hold value in the cache.
 func (c *Cache[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -46,6 +49,8 @@ func (c *Cache[K, V]) Set(key K, value V) {
 	c.store[key] = Item[K, V]{Value: value}
 }
 
+// SetEx key to hold value in the cache and set key to timeout after the
+// provided ttl.
 func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -54,6 +59,11 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 	c.store[key] = Item[K, V]{Value: value, ExpireAt: &expireAt}
 }
 
+// Get returns the value associated with the provided key if it exists, or false
+// if it does not.
+//
+// If the cache was opened with [WithPassiveExpiration] and the requested key
+// is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
 	r, ok := c.store[key]
@@ -68,18 +78,26 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 	return r.Value, ok
 }
 
+// Has returns true if the provided key exists in the cache.
+//
+// If the cache was opened with [WithPassiveExpiration] and the requested key
+// is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Has(key K) bool {
 	_, ok := c.Get(key)
 	return ok
 }
 
-func (c *Cache[K, V]) Delete(key K) {
+// Delete provided keys from the cache.
+func (c *Cache[K, V]) Delete(keys ...K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	delete(c.store, key)
+	for _, key := range keys {
+		delete(c.store, key)
+	}
 }
 
+// Flush the cache, deleting all keys.
 func (c *Cache[K, V]) Flush() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -87,6 +105,7 @@ func (c *Cache[K, V]) Flush() {
 	clear(c.store)
 }
 
+// Size returns the number of items currently in the cache.
 func (c *Cache[K, V]) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -94,6 +113,7 @@ func (c *Cache[K, V]) Size() int {
 	return len(c.store)
 }
 
+// Keys returns a slice of all keys currently in the cache.
 func (c *Cache[K, V]) Keys() []K {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -106,8 +126,8 @@ func (c *Cache[K, V]) Keys() []K {
 	return keys
 }
 
-// Close stops all of the cache's goroutines if any are running and should
-// therefore be called when c is no longer needed.
+// Close the cache, stopping all running goroutines. Should be called when the
+// cache is no longer needed.
 func (c *Cache[K, V]) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
