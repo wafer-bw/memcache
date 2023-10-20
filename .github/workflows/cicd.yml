@@ -19,13 +19,14 @@ jobs:
         go: [stable]
       fail-fast: true
     steps:
-      - name: Check out repository
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      - name: set up go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
+          cache: true
 
   build:
     name: build
@@ -37,16 +38,17 @@ jobs:
       fail-fast: true
     needs: setup
     steps:
-      - name: Check out repository
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      - name: set up go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - name: Run go generate
+          cache: true
+      - name: run go generate
         run: go generate ./... && git diff --exit-code
-      - name: Run go build
+      - name: run go build
         run: go build -o /dev/null ./...
 
   clean:
@@ -59,18 +61,19 @@ jobs:
       fail-fast: true
     needs: setup
     steps:
-      - name: Check out repository
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      - name: set up go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - name: Run go mod tidy
+          cache: true
+      - name: run go mod tidy
         run: go mod tidy && git diff --exit-code
-      - name: Run go mod verify
+      - name: run go mod verify
         run: go mod verify
-      - name: Run formatting
+      - name: run formatting
         run: go run golang.org/x/tools/cmd/goimports@latest -w . && git diff --exit-code
 
   lint:
@@ -83,14 +86,15 @@ jobs:
       fail-fast: true
     needs: setup
     steps:
-      - name: Check out repository
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      - name: set up go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - name: Run linting
+          cache: true
+      - name: run linting
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
@@ -105,14 +109,15 @@ jobs:
       fail-fast: true
     needs: setup
     steps:
-      - name: Check out repository
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      - name: set up go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - name: Run tests
+          cache: true
+      - name: run tests
         run: go test -shuffle=on -v -count=1 -race -failfast -timeout=30s -covermode=atomic -coverprofile=coverage.out ./...
       - name: Coverage
         uses: codecov/codecov-action@v3
@@ -127,12 +132,54 @@ jobs:
       fail-fast: true
     needs: setup
     steps:
-      - name: Check out repository
+      - name: checkout
         uses: actions/checkout@v3
-      - name: Set up Go
+      - name: set up go
         uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - name: Run benchmarks
+          cache: true
+      - name: run benchmarks
         run: go test -run=- -benchmem -bench . github.com/wafer-bw/memcache/...
+
+  gorelease:
+    permissions:
+      pull-requests: write
+    name: gorelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        go: [stable]
+      fail-fast: true
+    needs: setup
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: run git fetch
+        run: git fetch --force --tags
+      - name: set up go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go }}
+          check-latest: true
+          cache: true
+      - name: run go mod download & tidy
+        run: go mod download && go mod tidy
+      - name: run gorelease
+        id: gorelease
+        run: |
+          revision=$(go run golang.org/x/exp/cmd/gorelease@latest)
+          echo "revision: $revision"
+          echo "revision<<EOF"$'\n'"$revision"$'\n'EOF >> $GITHUB_OUTPUT
+      - name: Comment gorelease outpout
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: release
+          message: |
+            ```md
+            ${{ steps.gorelease.outputs.revision }}
+            ```

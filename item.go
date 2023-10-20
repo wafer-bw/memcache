@@ -5,7 +5,8 @@ import "time"
 type Item[K comparable, V any] struct {
 	Value    V
 	ExpireAt *time.Time
-	// OnEvicted func(k K, v V) // TODO: add this.
+	// TODO: OnEvicted func(k K, v V)
+	// TODO: OnExpired func(k K, v V)
 }
 
 func (i Item[K, V]) IsExpired() bool {
