@@ -40,12 +40,42 @@ func TestNew(t *testing.T) {
 		require.Nil(t, c)
 	})
 
-	t.Run("enables passive expiration", func(t *testing.T) {
+	t.Run("with passive expiration enables passive expiration", func(t *testing.T) {
 		t.Parallel()
 
 		c, err := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
 		require.NoError(t, err)
 		require.True(t, c.GetExpireOnGet())
+	})
+
+	t.Run("with expirer sets and runs the expirer", func(t *testing.T) {
+		t.Parallel()
+
+		ran := new(bool)
+		interval := 50 * time.Millisecond
+		expirer := func(store map[int]memcache.Item[int, string]) {
+			*ran = true
+		}
+
+		c, _ := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
+		defer c.Close()
+		time.Sleep(interval * 2)
+		require.NotNil(t, c.GetExpirer())
+		require.True(t, *ran)
+	})
+
+	t.Run("with expirer returns an error if the expirer function is nil", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.Open[int, int](memcache.WithExpirer[int, int](nil, 1*time.Second))
+		require.ErrorIs(t, err, memcache.ErrNilExpirerFunc)
+	})
+
+	t.Run("with expirer returns an error if the interval is less than or equal to 0", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.Open[int, int](memcache.WithExpirer[int, int](memcache.DeleteAllExpiredKeys, 0))
+		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
 }
 
@@ -306,42 +336,14 @@ func TestCache_Close(t *testing.T) {
 		}
 	})
 
-	t.Run("cache is not garbage collected after releasing without closing", func(t *testing.T) {
+	t.Run("cache with goroutines is garbage collected after releasing & closing", func(t *testing.T) {
 		t.Parallel()
 
 		ch := make(chan struct{})
 
 		cache := func() *memcache.Cache[int, string] {
 			interval := 1 * time.Second
-			expirer := memcache.DeleteAllExpired[int, string]
-			c, _ := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
-			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
-				close(ch)
-			})
-			return c
-		}()
-
-		cache.Flush() // use the cache once
-		cache = nil   // release the cache
-		runtime.GC()  // explicitly run garbage collection
-
-		select {
-		case <-time.After(250 * time.Millisecond):
-			// cache was not garbage collected
-		case <-ch:
-			t.Fatal("cache was garbage collected")
-		}
-	})
-
-	t.Run("cache is garbage collected after releasing & closing", func(t *testing.T) {
-		t.Parallel()
-
-		ch := make(chan struct{})
-
-		cache := func() *memcache.Cache[int, string] {
-			interval := 1 * time.Second
-			expirer := memcache.DeleteAllExpired[int, string]
-			c, _ := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
+			c, _ := memcache.Open[int, string](memcache.WithDefaultExpirer[int, string](interval))
 			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
 				close(ch)
 			})

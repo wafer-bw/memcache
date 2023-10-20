@@ -26,3 +26,11 @@ func (c *Cache[K, V]) Closed() bool {
 
 	return c.closed
 }
+
+// export for testing.
+func (c *Cache[K, V]) GetExpirer() ExpirerFunc[K, V] {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.expirer
+}

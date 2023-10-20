@@ -26,8 +26,7 @@ func ExampleNew_withPassiveExpirationEnabled() {
 
 func ExampleNew_withExpirer() {
 	interval := 1 * time.Second
-	expirer := memcache.DeleteAllExpired[int, string]
-	cache, err := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
+	cache, err := memcache.Open[int, string](memcache.WithDefaultExpirer[int, string](interval))
 	if err != nil {
 		panic(err)
 	}
