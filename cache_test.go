@@ -2,6 +2,7 @@ package memcache_test
 
 import (
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -280,5 +281,83 @@ func TestCache_Close(t *testing.T) {
 		require.NotPanics(t, func() { c.Close() })
 	})
 
-	// TODO: add test to make sure released cache after close is GC'd
+	t.Run("cache with no goroutines is garbage collected after releasing without closing", func(t *testing.T) {
+		t.Parallel()
+
+		ch := make(chan struct{})
+
+		cache := func() *memcache.Cache[int, string] {
+			c, _ := memcache.Open[int, string]()
+			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
+				close(ch)
+			})
+			return c
+		}()
+
+		cache.Flush() // use the cache once
+		cache = nil   // release the cache
+		runtime.GC()  // explicitly run garbage collection
+
+		select {
+		case <-time.After(250 * time.Millisecond):
+			t.Fatal("cache was not garbage collected")
+		case <-ch:
+			// cache was garbage collected
+		}
+	})
+
+	t.Run("cache is not garbage collected after releasing without closing", func(t *testing.T) {
+		t.Parallel()
+
+		ch := make(chan struct{})
+
+		cache := func() *memcache.Cache[int, string] {
+			interval := 1 * time.Second
+			expirer := memcache.DeleteAllExpired[int, string]
+			c, _ := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
+			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
+				close(ch)
+			})
+			return c
+		}()
+
+		cache.Flush() // use the cache once
+		cache = nil   // release the cache
+		runtime.GC()  // explicitly run garbage collection
+
+		select {
+		case <-time.After(250 * time.Millisecond):
+			// cache was not garbage collected
+		case <-ch:
+			t.Fatal("cache was garbage collected")
+		}
+	})
+
+	t.Run("cache is garbage collected after releasing & closing", func(t *testing.T) {
+		t.Parallel()
+
+		ch := make(chan struct{})
+
+		cache := func() *memcache.Cache[int, string] {
+			interval := 1 * time.Second
+			expirer := memcache.DeleteAllExpired[int, string]
+			c, _ := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
+			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
+				close(ch)
+			})
+			return c
+		}()
+
+		cache.Flush() // use the cache once
+		cache.Close() // close the cache
+		cache = nil   // release the cache
+		runtime.GC()  // explicitly run garbage collection
+
+		select {
+		case <-time.After(250 * time.Millisecond):
+			t.Fatal("cache was not garbage collected")
+		case <-ch:
+			// cache was garbage collected
+		}
+	})
 }
