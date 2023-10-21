@@ -13,6 +13,26 @@ func (c *Cache[K, V]) GetStore() (map[K]Item[K, V], UnlockFunc) {
 }
 
 // export for testing.
+func (c *Cache[K, V]) Lock() {
+	c.mu.Lock()
+}
+
+// export for testing.
+func (c *Cache[K, V]) Unlock() {
+	c.mu.Unlock()
+}
+
+// export for testing.
+func (c *Cache[K, V]) RLock() {
+	c.mu.RLock()
+}
+
+// export for testing.
+func (c *Cache[K, V]) RUnlock() {
+	c.mu.RUnlock()
+}
+
+// export for testing.
 func (c *Cache[K, V]) GetExpireOnGet() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

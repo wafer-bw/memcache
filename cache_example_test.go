@@ -7,8 +7,7 @@ import (
 	"github.com/wafer-bw/memcache"
 )
 
-// Create a new cache using int keys and string values.
-func ExampleNew() {
+func ExampleOpen() {
 	cache, err := memcache.Open[int, string]()
 	if err != nil {
 		panic(err)
@@ -16,7 +15,7 @@ func ExampleNew() {
 	_ = cache
 }
 
-func ExampleNew_withPassiveExpirationEnabled() {
+func ExampleOpen_withPassiveExpiration() {
 	cache, err := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
 	if err != nil {
 		panic(err)
@@ -24,9 +23,23 @@ func ExampleNew_withPassiveExpirationEnabled() {
 	_ = cache
 }
 
-func ExampleNew_withExpirer() {
+func ExampleOpen_withActiveExpiration() {
 	interval := 1 * time.Second
-	cache, err := memcache.Open[int, string](memcache.WithDefaultExpirer[int, string](interval))
+	expirer := memcache.DeleteAllExpiredKeys[int, string]
+	cache, err := memcache.Open[int, string](memcache.WithActiveExpiration(expirer, interval))
+	if err != nil {
+		panic(err)
+	}
+	_ = cache
+}
+
+func ExampleOpen_complete() {
+	interval := 1 * time.Second
+	expirer := memcache.DeleteAllExpiredKeys[int, string]
+	cache, err := memcache.Open[int, string](
+		memcache.WithActiveExpiration(expirer, interval),
+		memcache.WithPassiveExpiration[int, string](),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -98,6 +111,26 @@ func ExampleCache_Delete() {
 	_, ok := cache.Get(1)
 	fmt.Println(ok)
 	// Output:
+	// false
+}
+
+func ExampleCache_Delete_multipleKeys() {
+	cache, err := memcache.Open[int, string]()
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+	cache.Set(2, "two")
+
+	cache.Delete(1, 2)
+
+	_, ok := cache.Get(1)
+	fmt.Println(ok)
+	_, ok = cache.Get(1)
+	fmt.Println(ok)
+	// Output:
+	// false
 	// false
 }
 

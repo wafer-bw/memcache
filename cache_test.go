@@ -52,29 +52,31 @@ func TestNew(t *testing.T) {
 		t.Parallel()
 
 		ran := new(bool)
-		interval := 50 * time.Millisecond
+		interval := 1 * time.Microsecond
 		expirer := func(store map[int]memcache.Item[int, string]) {
 			*ran = true
 		}
 
-		c, _ := memcache.Open[int, string](memcache.WithExpirer[int, string](expirer, interval))
+		c, _ := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](expirer, interval))
 		defer c.Close()
 		time.Sleep(interval * 2)
 		require.NotNil(t, c.GetExpirer())
+		c.RLock()
 		require.True(t, *ran)
+		c.RUnlock()
 	})
 
 	t.Run("with expirer returns an error if the expirer function is nil", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.Open[int, int](memcache.WithExpirer[int, int](nil, 1*time.Second))
+		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](nil, 1*time.Second))
 		require.ErrorIs(t, err, memcache.ErrNilExpirerFunc)
 	})
 
 	t.Run("with expirer returns an error if the interval is less than or equal to 0", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.Open[int, int](memcache.WithExpirer[int, int](memcache.DeleteAllExpiredKeys, 0))
+		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](memcache.DeleteAllExpiredKeys, 0))
 		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
 }
@@ -196,6 +198,21 @@ func TestCache_Set(t *testing.T) {
 		require.Contains(t, store, 1)
 		require.Equal(t, "a", store[1].Value)
 	})
+
+	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
+		t.Parallel()
+
+		v := false
+		c, _ := memcache.Open[int, *bool]()
+
+		c.Set(1, &v)
+		v = true
+
+		store, unlock := c.GetStore()
+		defer unlock()
+		require.Contains(t, store, 1)
+		require.Equal(t, true, *store[1].Value)
+	})
 }
 
 func TestCache_SetEx(t *testing.T) {
@@ -219,7 +236,7 @@ func TestCache_SetEx(t *testing.T) {
 func TestCache_Delete(t *testing.T) {
 	t.Parallel()
 
-	t.Run("successfully deletes value from the cache at provided key", func(t *testing.T) {
+	t.Run("successfully deletes key from cache", func(t *testing.T) {
 		t.Parallel()
 
 		c, _ := memcache.Open[int, string]()
@@ -232,6 +249,23 @@ func TestCache_Delete(t *testing.T) {
 		store, unlock = c.GetStore()
 		defer unlock()
 		require.NotContains(t, store, 1)
+	})
+
+	t.Run("successfully deletes keys from cache", func(t *testing.T) {
+		t.Parallel()
+
+		c, _ := memcache.Open[int, string]()
+		store, unlock := c.GetStore()
+		store[1] = memcache.Item[int, string]{Value: "a"}
+		store[2] = memcache.Item[int, string]{Value: "b"}
+		unlock()
+
+		c.Delete(1, 2)
+
+		store, unlock = c.GetStore()
+		defer unlock()
+		require.NotContains(t, store, 1)
+		require.NotContains(t, store, 2)
 	})
 }
 
@@ -343,7 +377,8 @@ func TestCache_Close(t *testing.T) {
 
 		cache := func() *memcache.Cache[int, string] {
 			interval := 1 * time.Second
-			c, _ := memcache.Open[int, string](memcache.WithDefaultExpirer[int, string](interval))
+			expirer := memcache.DeleteAllExpiredKeys[int, string]
+			c, _ := memcache.Open[int, string](memcache.WithActiveExpiration(expirer, interval))
 			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
 				close(ch)
 			})
