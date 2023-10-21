@@ -196,6 +196,21 @@ func TestCache_Set(t *testing.T) {
 		require.Contains(t, store, 1)
 		require.Equal(t, "a", store[1].Value)
 	})
+
+	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
+		t.Parallel()
+
+		v := false
+		c, _ := memcache.Open[int, *bool]()
+
+		c.Set(1, &v)
+		v = true
+
+		store, unlock := c.GetStore()
+		defer unlock()
+		require.Contains(t, store, 1)
+		require.Equal(t, true, *store[1].Value)
+	})
 }
 
 func TestCache_SetEx(t *testing.T) {
