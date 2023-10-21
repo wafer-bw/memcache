@@ -1,6 +1,7 @@
 package memcache
 
 import (
+	"container/list"
 	"time"
 )
 
@@ -43,6 +44,20 @@ func WithActiveExpiration[K comparable, V any](f ExpirerFunc[K, V], interval tim
 	}
 }
 
-// TODO: type EvictorFunc
+// WithLRUEviction enables the eviction of the least recently used key when the
+// cache would breach its capacity.
+func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		if capacity <= 1 {
+			return ErrInvalidCapacity
+		}
 
-// TODO: func WithEvictor
+		c.evictor = lruEvictor[K]{
+			capacity: capacity,
+			list:     list.New(),
+			elements: make(map[K]*list.Element, capacity),
+		}
+
+		return nil
+	}
+}

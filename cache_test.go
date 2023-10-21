@@ -83,6 +83,23 @@ func TestNew(t *testing.T) {
 		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](memcache.DeleteAllExpiredKeys, 0))
 		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
+
+	t.Run("LRU TEST TODO", func(t *testing.T) {
+		t.Parallel()
+
+		capacity := 10
+		c, _ := memcache.Open[int, string](memcache.WithLRUEviction[int, string](capacity))
+		for i := 0; i < capacity; i++ {
+			c.Set(i, "")
+		}
+		c.Set(0, "")
+		for i := capacity; i <= capacity+5; i++ {
+			c.Set(i, "")
+		}
+
+		require.Equal(t, capacity, c.Size())
+		require.Contains(t, c.Keys(), 0)
+	})
 }
 
 func TestCache_Get(t *testing.T) {

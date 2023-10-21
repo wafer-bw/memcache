@@ -1,9 +1,18 @@
 package memcache
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
+
+type evictor[K comparable] interface {
+	Over() int
+	Add(key K)
+	Use(key K)
+	Remove(key K)
+	Evict() (K, bool)
+}
 
 // Cache is a generic in-memory key-value thread-safe* cache.
 //
@@ -12,13 +21,17 @@ import (
 // stricter type constraint on K or V to prevent this, it is left up to the user
 // to decide the nature of their cache.
 type Cache[K comparable, V any] struct {
-	mu                 sync.RWMutex
-	store              map[K]Item[K, V]
+	mu    sync.RWMutex
+	store map[K]Item[K, V]
+
 	passiveExpiration  bool
 	expirationInterval time.Duration
 	expirer            ExpirerFunc[K, V]
-	closeCh            chan struct{}
-	closed             bool
+
+	evictor evictor[K]
+
+	closeCh chan struct{}
+	closed  bool
 }
 
 // Open a new in-memory key-value cache.
@@ -47,10 +60,42 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 
 // Set permanent key to hold value in the cache.
 func (c *Cache[K, V]) Set(key K, value V) {
+	keysToEvict := make([]K, 0)
+	hasKey := c.Has(key)
+
 	c.mu.Lock()
-	defer c.mu.Unlock()
+
+	if c.evictor != nil {
+		if !hasKey {
+			fmt.Println("add", key)
+			c.evictor.Add(key)
+		} else {
+			fmt.Println("use", key)
+			c.evictor.Use(key)
+		}
+
+		over := c.evictor.Over()
+		if over > 0 {
+			keysToEvict = make([]K, 0, over)
+			for i := 0; i < over; i++ {
+				k, ok := c.evictor.Evict()
+				fmt.Println("should evict", k, ok)
+				if !ok {
+					continue
+				}
+				keysToEvict = append(keysToEvict, k)
+			}
+		}
+	}
 
 	c.store[key] = Item[K, V]{Value: value}
+
+	c.mu.Unlock()
+
+	for _, key := range keysToEvict {
+		fmt.Println("evict", key)
+		c.Delete(key)
+	}
 }
 
 // SetEx key to hold value in the cache and set key to timeout after the
@@ -98,6 +143,10 @@ func (c *Cache[K, V]) Delete(keys ...K) {
 
 	for _, key := range keys {
 		delete(c.store, key)
+
+		if c.evictor != nil {
+			c.evictor.Remove(key)
+		}
 	}
 }
 
