@@ -52,7 +52,7 @@ func TestNew(t *testing.T) {
 		t.Parallel()
 
 		ran := new(bool)
-		interval := 50 * time.Millisecond
+		interval := 1 * time.Microsecond
 		expirer := func(store map[int]memcache.Item[int, string]) {
 			*ran = true
 		}
@@ -61,7 +61,9 @@ func TestNew(t *testing.T) {
 		defer c.Close()
 		time.Sleep(interval * 2)
 		require.NotNil(t, c.GetExpirer())
+		c.RLock()
 		require.True(t, *ran)
+		c.RUnlock()
 	})
 
 	t.Run("with expirer returns an error if the expirer function is nil", func(t *testing.T) {
