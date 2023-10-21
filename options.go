@@ -12,9 +12,7 @@ type Option[K comparable, V any] func(*Cache[K, V]) error
 // read methods such as [Cache.Get] & [Cache.Has].
 //
 // This can be combined with [WithActiveExpiration] to enable both passive and
-// active expiration of keys.
-//
-// See [Open] for example usage.
+// active expiration of keys. See [Open] for example usage.
 func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		c.passiveExpiration = true

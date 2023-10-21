@@ -5,9 +5,13 @@ import (
 	"time"
 )
 
+// Cache is a generic in-memory key-value thread-safe* cache.
+//
+// *Due to the generic nature of the cache it is possible to store types that
+// are mutatable by reference which is not thread-safe. Instead of applying a
+// stricter type constraint on K or V to prevent this, it is left up to the user
+// to decide the nature of their cache.
 type Cache[K comparable, V any] struct {
-	// TODO: docstring
-
 	mu                 sync.RWMutex
 	store              map[K]Item[K, V]
 	passiveExpiration  bool
@@ -35,7 +39,7 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	}
 
 	if cache.expirer != nil && cache.expirationInterval > 0 {
-		go cache.runExpirer()
+		go cache.runActiveExpirer()
 	}
 
 	return cache, nil
@@ -66,16 +70,16 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 // is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
-	r, ok := c.store[key]
+	item, ok := c.store[key]
 	c.mu.RUnlock()
 
-	if ok && c.passiveExpiration && r.IsExpired() {
+	if ok && c.passiveExpiration && item.IsExpired() {
 		c.Delete(key)
 		var v V
 		return v, false
 	}
 
-	return r.Value, ok
+	return item.Value, ok
 }
 
 // Has returns true if the provided key exists in the cache.
@@ -119,8 +123,8 @@ func (c *Cache[K, V]) Keys() []K {
 	defer c.mu.RUnlock()
 
 	keys := make([]K, 0, len(c.store))
-	for k := range c.store {
-		keys = append(keys, k)
+	for key := range c.store {
+		keys = append(keys, key)
 	}
 
 	return keys
@@ -140,7 +144,7 @@ func (c *Cache[K, V]) Close() {
 	close(c.closeCh)
 }
 
-func (c *Cache[K, V]) runExpirer() {
+func (c *Cache[K, V]) runActiveExpirer() {
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
 
