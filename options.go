@@ -45,6 +45,10 @@ func WithActiveExpiration[K comparable, V any](f ExpirerFunc[K, V], interval tim
 
 // WithLRUEviction enables the eviction of the least recently used key when the
 // cache would breach its capacity.
+//
+// Since calculating the size of a generic map in memory is incurrs a
+// heavy performance cost, the capacity of a cache is defined as the total
+// number of keys it is allowed to hold.
 func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		store, err := newLRUStore[K, V](capacity)
