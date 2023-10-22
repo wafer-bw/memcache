@@ -1,7 +1,6 @@
 package memcache
 
 import (
-	"container/list"
 	"time"
 )
 
@@ -48,15 +47,12 @@ func WithActiveExpiration[K comparable, V any](f ExpirerFunc[K, V], interval tim
 // cache would breach its capacity.
 func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		if capacity <= 1 {
-			return ErrInvalidCapacity
+		store, err := newLRUStore[K, V](capacity)
+		if err != nil {
+			return err
 		}
 
-		c.evictor = lruEvictor[K]{
-			capacity: capacity,
-			list:     list.New(),
-			elements: make(map[K]*list.Element, capacity),
-		}
+		c.store = store
 
 		return nil
 	}

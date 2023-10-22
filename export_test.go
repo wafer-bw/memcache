@@ -1,45 +1,46 @@
 package memcache
 
+// Everything in this file is exported for testing purposes only.
+
+import "container/list"
+
 // UnlockFunc unlockes the mutex for the cache store.
-//
-// export for testing.
 type UnlockFunc func()
 
-// export for testing.
-func (c *Cache[K, V]) GetStore() (map[K]Item[K, V], UnlockFunc) {
+func (c *Cache[K, V]) Store() (storer[K, V], UnlockFunc) {
 	c.mu.Lock()
 
 	return c.store, c.mu.Unlock
 }
 
-// export for testing.
+func (c *Cache[K, V]) Items() (map[K]Item[K, V], UnlockFunc) {
+	c.mu.Lock()
+
+	return c.store.Items(), c.mu.Unlock
+}
+
 func (c *Cache[K, V]) Lock() {
 	c.mu.Lock()
 }
 
-// export for testing.
 func (c *Cache[K, V]) Unlock() {
 	c.mu.Unlock()
 }
 
-// export for testing.
 func (c *Cache[K, V]) RLock() {
 	c.mu.RLock()
 }
 
-// export for testing.
 func (c *Cache[K, V]) RUnlock() {
 	c.mu.RUnlock()
 }
 
-// export for testing.
-func (c *Cache[K, V]) GetExpireOnGet() bool {
+func (c *Cache[K, V]) PassiveExpiration() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.passiveExpiration
 }
 
-// export for testing.
 func (c *Cache[K, V]) Closed() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -47,10 +48,50 @@ func (c *Cache[K, V]) Closed() bool {
 	return c.closed
 }
 
-// export for testing.
-func (c *Cache[K, V]) GetExpirer() ExpirerFunc[K, V] {
+func (c *Cache[K, V]) Expirer() ExpirerFunc[K, V] {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return c.expirer
+}
+
+type LRUStore[K comparable, V any] struct {
+	Underlying lruStore[K, V]
+}
+
+func NewLRUStore[K comparable, V any](capacity int) (LRUStore[K, V], error) {
+	store, err := newLRUStore[K, V](capacity)
+	if err != nil {
+		return LRUStore[K, V]{}, err
+	}
+
+	return LRUStore[K, V]{
+		Underlying: store,
+	}, nil
+}
+
+func (s LRUStore[K, V]) Items() map[K]Item[K, V] {
+	return s.Underlying.items
+}
+
+func (s LRUStore[K, V]) Elements() map[K]*list.Element {
+	return s.Underlying.elements
+}
+
+func (s LRUStore[K, V]) List() *list.List {
+	return s.Underlying.list
+}
+
+type NoEvictStore[K comparable, V any] struct {
+	Underlying noEvictStore[K, V]
+}
+
+func NewNoEvictStore[K comparable, V any]() NoEvictStore[K, V] {
+	return NoEvictStore[K, V]{
+		Underlying: newNoEvictStore[K, V](),
+	}
+}
+
+func (s NoEvictStore[K, V]) Items() map[K]Item[K, V] {
+	return s.Underlying.items
 }

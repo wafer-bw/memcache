@@ -1,17 +1,17 @@
 package memcache
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
 
-type evictor[K comparable] interface {
-	Over() int
-	Add(key K)
-	Use(key K)
-	Remove(key K)
-	Evict() (K, bool)
+type storer[K comparable, V any] interface {
+	Set(key K, value Item[K, V])
+	Get(key K) (Item[K, V], bool)
+	Delete(keys ...K)
+	Items() map[K]Item[K, V]
+	Size() int
+	Clear()
 }
 
 // Cache is a generic in-memory key-value thread-safe* cache.
@@ -22,13 +22,11 @@ type evictor[K comparable] interface {
 // to decide the nature of their cache.
 type Cache[K comparable, V any] struct {
 	mu    sync.RWMutex
-	store map[K]Item[K, V]
+	store storer[K, V]
 
 	passiveExpiration  bool
 	expirationInterval time.Duration
 	expirer            ExpirerFunc[K, V]
-
-	evictor evictor[K]
 
 	closeCh chan struct{}
 	closed  bool
@@ -38,7 +36,7 @@ type Cache[K comparable, V any] struct {
 func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	cache := &Cache[K, V]{
 		mu:      sync.RWMutex{},
-		store:   map[K]Item[K, V]{},
+		store:   newNoEvictStore[K, V](),
 		closeCh: make(chan struct{}),
 	}
 
@@ -60,42 +58,10 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 
 // Set permanent key to hold value in the cache.
 func (c *Cache[K, V]) Set(key K, value V) {
-	keysToEvict := make([]K, 0)
-	hasKey := c.Has(key)
-
 	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if c.evictor != nil {
-		if !hasKey {
-			fmt.Println("add", key)
-			c.evictor.Add(key)
-		} else {
-			fmt.Println("use", key)
-			c.evictor.Use(key)
-		}
-
-		over := c.evictor.Over()
-		if over > 0 {
-			keysToEvict = make([]K, 0, over)
-			for i := 0; i < over; i++ {
-				k, ok := c.evictor.Evict()
-				fmt.Println("should evict", k, ok)
-				if !ok {
-					continue
-				}
-				keysToEvict = append(keysToEvict, k)
-			}
-		}
-	}
-
-	c.store[key] = Item[K, V]{Value: value}
-
-	c.mu.Unlock()
-
-	for _, key := range keysToEvict {
-		fmt.Println("evict", key)
-		c.Delete(key)
-	}
+	c.store.Set(key, Item[K, V]{Value: value})
 }
 
 // SetEx key to hold value in the cache and set key to timeout after the
@@ -105,7 +71,7 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 	defer c.mu.Unlock()
 
 	expireAt := time.Now().Add(ttl)
-	c.store[key] = Item[K, V]{Value: value, ExpireAt: &expireAt}
+	c.store.Set(key, Item[K, V]{Value: value, ExpireAt: &expireAt})
 }
 
 // Get returns the value associated with the provided key if it exists, or false
@@ -115,7 +81,7 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 // is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
-	item, ok := c.store[key]
+	item, ok := c.store.Get(key)
 	c.mu.RUnlock()
 
 	if ok && c.passiveExpiration && item.IsExpired() {
@@ -141,13 +107,7 @@ func (c *Cache[K, V]) Delete(keys ...K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	for _, key := range keys {
-		delete(c.store, key)
-
-		if c.evictor != nil {
-			c.evictor.Remove(key)
-		}
-	}
+	c.store.Delete(keys...)
 }
 
 // Flush the cache, deleting all keys.
@@ -155,7 +115,7 @@ func (c *Cache[K, V]) Flush() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	clear(c.store)
+	c.store.Clear()
 }
 
 // Size returns the number of items currently in the cache.
@@ -163,7 +123,7 @@ func (c *Cache[K, V]) Size() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return len(c.store)
+	return c.store.Size()
 }
 
 // Keys returns a slice of all keys currently in the cache.
@@ -171,8 +131,9 @@ func (c *Cache[K, V]) Keys() []K {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	keys := make([]K, 0, len(c.store))
-	for key := range c.store {
+	items := c.store.Items()
+	keys := make([]K, 0, len(items))
+	for key := range items {
 		keys = append(keys, key)
 	}
 
@@ -203,12 +164,8 @@ func (c *Cache[K, V]) runActiveExpirer() {
 			return
 		case <-ticker.C:
 			c.mu.Lock()
-			c.expirer(c.store)
+			c.expirer(c.store.Items())
 			c.mu.Unlock()
 		}
 	}
 }
-
-// TODO: Add Items() that returns a shallow copy of c.store?
-//       Naming may need to distinguish from a potential method that
-//       gives access to the real c.store.
