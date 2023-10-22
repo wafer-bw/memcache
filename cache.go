@@ -5,15 +5,6 @@ import (
 	"time"
 )
 
-type storer[K comparable, V any] interface {
-	Set(key K, value Item[K, V])
-	Get(key K) (Item[K, V], bool)
-	Delete(keys ...K)
-	Items() map[K]Item[K, V]
-	Size() int
-	Clear()
-}
-
 // Cache is a generic in-memory key-value thread-safe* cache.
 //
 // *Due to the generic nature of the cache it is possible to store types that
@@ -168,4 +159,13 @@ func (c *Cache[K, V]) runActiveExpirer() {
 			c.mu.Unlock()
 		}
 	}
+}
+
+type storer[K comparable, V any] interface {
+	Set(key K, value Item[K, V])
+	Get(key K) (Item[K, V], bool)
+	Delete(keys ...K)
+	Items() map[K]Item[K, V]
+	Size() int
+	Clear()
 }
