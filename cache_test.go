@@ -385,6 +385,23 @@ func TestCache_Delete(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("does not panic when deleting keys that do not exist in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				require.NotPanics(t, func() {
+					c.Delete(1, 2)
+				})
+			})
+		}
+	})
 }
 
 func TestCache_Flush(t *testing.T) {
