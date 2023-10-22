@@ -115,6 +115,68 @@ func TestNew(t *testing.T) {
 	})
 }
 
+func TestCache_Set(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successfully stores value in the cache at provided key", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				c.Set(1, 1)
+				items, unlock := c.Items()
+				defer unlock()
+				require.Contains(t, items, 1)
+				require.Equal(t, 1, items[1].Value)
+			})
+		}
+	})
+
+	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
+		t.Parallel()
+
+		v := false
+		c, _ := memcache.Open[int, *bool]()
+
+		c.Set(1, &v)
+		v = true
+
+		items, unlock := c.Items()
+		defer unlock()
+		require.Contains(t, items, 1)
+		require.Equal(t, true, *items[1].Value)
+	})
+}
+
+func TestCache_SetEx(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successfully stores value in the cache with a TTL", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				c.SetEx(1, 1, 1*time.Minute)
+				items, unlock := c.Items()
+				defer unlock()
+				require.Contains(t, items, 1)
+				require.Equal(t, 1, items[1].Value)
+				require.Greater(t, *items[1].ExpireAt, time.Now())
+			})
+		}
+	})
+}
+
 func TestCache_Get(t *testing.T) {
 	t.Parallel()
 
@@ -272,68 +334,6 @@ func TestCache_Has(t *testing.T) {
 
 				ok := c.Has(1)
 				require.True(t, ok)
-			})
-		}
-	})
-}
-
-func TestCache_Set(t *testing.T) {
-	t.Parallel()
-
-	t.Run("successfully stores value in the cache at provided key", func(t *testing.T) {
-		t.Parallel()
-
-		for policy, newCache := range policies {
-			newCache := newCache
-			t.Run(policy, func(t *testing.T) {
-				t.Parallel()
-
-				c, _ := newCache(cacheSize)
-
-				c.Set(1, 1)
-				items, unlock := c.Items()
-				defer unlock()
-				require.Contains(t, items, 1)
-				require.Equal(t, 1, items[1].Value)
-			})
-		}
-	})
-
-	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
-		t.Parallel()
-
-		v := false
-		c, _ := memcache.Open[int, *bool]()
-
-		c.Set(1, &v)
-		v = true
-
-		items, unlock := c.Items()
-		defer unlock()
-		require.Contains(t, items, 1)
-		require.Equal(t, true, *items[1].Value)
-	})
-}
-
-func TestCache_SetEx(t *testing.T) {
-	t.Parallel()
-
-	t.Run("successfully stores value in the cache with a TTL", func(t *testing.T) {
-		t.Parallel()
-
-		for policy, newCache := range policies {
-			newCache := newCache
-			t.Run(policy, func(t *testing.T) {
-				t.Parallel()
-
-				c, _ := newCache(cacheSize)
-
-				c.SetEx(1, 1, 1*time.Minute)
-				items, unlock := c.Items()
-				defer unlock()
-				require.Contains(t, items, 1)
-				require.Equal(t, 1, items[1].Value)
-				require.Greater(t, *items[1].ExpireAt, time.Now())
 			})
 		}
 	})
