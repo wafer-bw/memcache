@@ -51,7 +51,7 @@ func WithActiveExpiration[K comparable, V any](f ExpirerFunc[K, V], interval tim
 // number of keys it is allowed to hold.
 func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		store, err := newLRUStore[K, V](capacity)
+		store, err := newLRUStore[K, V](capacity, c.closer)
 		if err != nil {
 			return err
 		}

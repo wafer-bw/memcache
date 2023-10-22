@@ -2,56 +2,27 @@ package memcache
 
 // Everything in this file is exported for testing purposes only.
 
-import "container/list"
+import (
+	"container/list"
 
-// UnlockFunc unlockes the mutex for the cache store.
-type UnlockFunc func()
+	"github.com/wafer-bw/memcache/internal/closer"
+)
 
-func (c *Cache[K, V]) Store() (storer[K, V], UnlockFunc) {
-	c.mu.Lock()
+type UnlockFunc unlockFunc
 
-	return c.store, c.mu.Unlock
-}
-
-func (c *Cache[K, V]) Items() (map[K]Item[K, V], UnlockFunc) {
-	c.mu.Lock()
-
-	return c.store.Items(), c.mu.Unlock
-}
-
-func (c *Cache[K, V]) Lock() {
-	c.mu.Lock()
-}
-
-func (c *Cache[K, V]) Unlock() {
-	c.mu.Unlock()
-}
-
-func (c *Cache[K, V]) RLock() {
-	c.mu.RLock()
-}
-
-func (c *Cache[K, V]) RUnlock() {
-	c.mu.RUnlock()
+func (c *Cache[K, V]) Store() storer[K, V] {
+	return c.store
 }
 
 func (c *Cache[K, V]) PassiveExpiration() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	return c.passiveExpiration
 }
 
 func (c *Cache[K, V]) Closed() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return c.closed
+	return c.closer.Closed()
 }
 
 func (c *Cache[K, V]) Expirer() ExpirerFunc[K, V] {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	return c.expirer
 }
 
@@ -59,8 +30,8 @@ type LRUStore[K comparable, V any] struct {
 	Underlying lruStore[K, V]
 }
 
-func NewLRUStore[K comparable, V any](capacity int) (LRUStore[K, V], error) {
-	store, err := newLRUStore[K, V](capacity)
+func NewLRUStore[K comparable, V any](capacity int, closer *closer.Closer) (LRUStore[K, V], error) {
+	store, err := newLRUStore[K, V](capacity, closer)
 	if err != nil {
 		return LRUStore[K, V]{}, err
 	}
