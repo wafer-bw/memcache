@@ -18,7 +18,7 @@ type storer[K comparable, V any] interface {
 //
 // *Due to the generic nature of the cache it is possible to store types that
 // are mutatable by reference which is not thread-safe. Instead of applying a
-// stricter type constraint on K or V to prevent this, it is left up to the user
+// stricter type constraint on K & V to prevent this, it is left up to the user
 // to decide the nature of their cache.
 type Cache[K comparable, V any] struct {
 	mu    sync.RWMutex
