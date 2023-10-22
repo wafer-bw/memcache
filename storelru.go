@@ -46,7 +46,10 @@ func (s lruStore[K, V]) Items() map[K]Item[K, V] {
 
 func (s lruStore[K, V]) Delete(keys ...K) {
 	for _, key := range keys {
-		element := s.elements[key] // TODO: check !ok and handle?
+		element, ok := s.elements[key]
+		if !ok {
+			continue
+		}
 
 		s.list.Remove(element)
 		delete(s.elements, key)
