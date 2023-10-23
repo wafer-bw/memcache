@@ -72,6 +72,18 @@ func (s lruStore[K, V]) Get(key K) (Item[K, V], bool) {
 	s.list.MoveToFront(s.elements[key])
 
 	return item, true
+
+	// TODO: compare against this:
+	// s.mu.RLock()
+	// item, ok := s.items[key]
+	// if !ok {
+	// 	return Item[K, V]{}, false
+	// }
+	// s.mu.RUnlock()
+	// s.mu.Lock()
+	// s.list.MoveToFront(s.elements[key])
+	// s.mu.Unlock()
+	// return item, true
 }
 
 func (s lruStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
