@@ -47,6 +47,25 @@ func BenchmarkCache_Get(b *testing.B) {
 	}
 }
 
+func BenchmarkCache_Get_parallel(b *testing.B) {
+	for policy, newCache := range policies {
+		cache, err := newCache(2)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		cache.Set(1, 1)
+
+		b.Run(fmt.Sprintf("%s policy parallel", policy), func(b *testing.B) {
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					_, _ = cache.Get(1)
+				}
+			})
+		})
+	}
+}
+
 func BenchmarkCache_Has(b *testing.B) {
 	for policy, newCache := range policies {
 		for _, size := range sizes {
