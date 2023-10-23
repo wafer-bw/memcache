@@ -125,7 +125,7 @@ jobs:
   benchmark:
     name: benchmark
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 1
     strategy:
       matrix:
         go: [stable]
@@ -141,7 +141,7 @@ jobs:
           check-latest: true
           cache: true
       - name: run benchmarks
-        run: go test -run=- -benchmem -bench . github.com/wafer-bw/memcache/...
+        run: go test -run=- -benchmem -bench -benchtime=1x . github.com/wafer-bw/memcache/...
 
   gorelease:
     permissions:
