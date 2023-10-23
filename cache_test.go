@@ -3,6 +3,7 @@ package memcache_test
 import (
 	"errors"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,37 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 		options = append(options, memcache.WithLRUEviction[int, int](size))
 		return memcache.Open[int, int](options...)
 	},
+}
+
+func TestCacheConcurrentAccess(t *testing.T) {
+	for policy, newCache := range policies {
+		newCache := newCache
+		t.Run(policy, func(t *testing.T) {
+			n := 1000
+			cache, _ := newCache(n)
+
+			for i := 0; i < n; i++ {
+				cache.Set(i, i)
+			}
+
+			var wg sync.WaitGroup
+			for i := 0; i < n; i++ {
+				wg.Add(1)
+				go func(i int) {
+					defer wg.Done()
+					cache.Get(i)
+					cache.Set(i, i*2)
+				}(i)
+			}
+			wg.Wait()
+
+			for i := 0; i < n; i++ {
+				value, ok := cache.Get(i)
+				require.True(t, ok)
+				require.Equal(t, i*2, value)
+			}
+		})
+	}
 }
 
 func TestNew(t *testing.T) {
