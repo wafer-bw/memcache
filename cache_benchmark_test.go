@@ -140,7 +140,7 @@ func BenchmarkCache_Items(b *testing.B) {
 
 			b.Run(fmt.Sprintf("%d keys %s policy", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					_, unlock := cache.Items()
+					_, unlock := cache.Store().Items()
 					unlock()
 				}
 			})
