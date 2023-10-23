@@ -10,6 +10,18 @@ import (
 	"github.com/wafer-bw/memcache"
 )
 
+const cacheSize = 100
+
+var policies = map[string]func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error){
+	"noevict": func(_ int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+		return memcache.Open[int, int](options...)
+	},
+	"lru": func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+		options = append(options, memcache.WithLRUEviction[int, int](size))
+		return memcache.Open[int, int](options...)
+	},
+}
+
 func TestNew(t *testing.T) {
 	t.Parallel()
 
@@ -45,28 +57,28 @@ func TestNew(t *testing.T) {
 
 		c, err := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
 		require.NoError(t, err)
-		require.True(t, c.GetExpireOnGet())
+		require.True(t, c.PassiveExpiration())
 	})
 
 	t.Run("with expirer sets and runs the expirer", func(t *testing.T) {
 		t.Parallel()
 
-		ran := new(bool)
+		// TODO: once expirer func is an interface use a mock to expect call.
+
+		ch := make(chan struct{})
 		interval := 25 * time.Millisecond
-		expirer := func(store map[int]memcache.Item[int, string]) {
-			*ran = true
+		expirer := func(items map[int]memcache.Item[int, string]) {
+			close(ch)
 		}
 
 		c, _ := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](expirer, interval))
 		defer c.Close()
-		time.Sleep(interval * 2)
-		require.NotNil(t, c.GetExpirer())
 
-		// increase chances of race condition to make test more reliable
-		for i := 0; i < 100000; i++ {
-			c.RLock()
-			require.True(t, *ran)
-			c.RUnlock()
+		select {
+		case <-time.After(interval * 2):
+			t.Fatal("expirer was not called")
+		case <-ch:
+			// expirer was called
 		}
 	})
 
@@ -83,107 +95,21 @@ func TestNew(t *testing.T) {
 		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](memcache.DeleteAllExpiredKeys, 0))
 		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
-}
 
-func TestCache_Get(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns value of key & true when key exists in the cache", func(t *testing.T) {
+	t.Run("with lru eviction sets the store to an lru store", func(t *testing.T) {
 		t.Parallel()
+		c, _ := memcache.Open[int, string](memcache.WithLRUEviction[int, string](2))
+		store := c.Store()
 
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		unlock()
-
-		got, ok := c.Get(1)
-		require.True(t, ok)
-		require.Equal(t, "a", got)
+		expected := memcache.LRUStore[int, string]{}.Underlying
+		require.IsType(t, expected, store)
 	})
 
-	t.Run("returns empty string & false when key does not exist in the cache", func(t *testing.T) {
+	t.Run("with lru eviction returns an error if the capacity is less than or equal to 1", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
-
-		got, ok := c.Get(1)
-		require.False(t, ok)
-		require.Equal(t, "", got)
-	})
-
-	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
-		t.Parallel()
-
-		expireAt := time.Now()
-		c, _ := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
-		unlock()
-
-		got, ok := c.Get(1)
-		require.False(t, ok)
-		require.Equal(t, "", got)
-	})
-
-	t.Run("does not delete expired keys when passive expiration is disabled", func(t *testing.T) {
-		t.Parallel()
-
-		expireAt := time.Now()
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
-		unlock()
-
-		got, ok := c.Get(1)
-		require.True(t, ok)
-		require.Equal(t, "a", got)
-	})
-}
-
-func TestCache_Has(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns true if key exists in the cache", func(t *testing.T) {
-		t.Parallel()
-
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		unlock()
-
-		require.True(t, c.Has(1))
-	})
-
-	t.Run("returns false when key does not exist in the cache", func(t *testing.T) {
-		t.Parallel()
-
-		c, _ := memcache.Open[int, string]()
-
-		require.False(t, c.Has(1))
-	})
-
-	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
-		t.Parallel()
-
-		expireAt := time.Now()
-		c, _ := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
-		unlock()
-
-		require.False(t, c.Has(1))
-	})
-
-	t.Run("does not delete expired keys when passive expiration is disabled", func(t *testing.T) {
-		t.Parallel()
-
-		expireAt := time.Now()
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a", ExpireAt: &expireAt}
-		unlock()
-
-		require.True(t, c.Has(1))
+		_, err := memcache.Open[int, int](memcache.WithLRUEviction[int, int](1))
+		require.ErrorIs(t, err, memcache.ErrInvalidCapacity)
 	})
 }
 
@@ -193,14 +119,20 @@ func TestCache_Set(t *testing.T) {
 	t.Run("successfully stores value in the cache at provided key", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		c.Set(1, "a")
+				c, _ := newCache(cacheSize)
 
-		store, unlock := c.GetStore()
-		defer unlock()
-		require.Contains(t, store, 1)
-		require.Equal(t, "a", store[1].Value)
+				c.Set(1, 1)
+				items, unlock := c.Store().Items()
+				defer unlock()
+				require.Contains(t, items, 1)
+				require.Equal(t, 1, items[1].Value)
+			})
+		}
 	})
 
 	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
@@ -212,10 +144,10 @@ func TestCache_Set(t *testing.T) {
 		c.Set(1, &v)
 		v = true
 
-		store, unlock := c.GetStore()
+		items, unlock := c.Store().Items()
 		defer unlock()
-		require.Contains(t, store, 1)
-		require.Equal(t, true, *store[1].Value)
+		require.Contains(t, items, 1)
+		require.Equal(t, true, *items[1].Value)
 	})
 }
 
@@ -225,15 +157,177 @@ func TestCache_SetEx(t *testing.T) {
 	t.Run("successfully stores value in the cache with a TTL", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		c.SetEx(1, "a", 1*time.Minute)
+				c, _ := newCache(cacheSize)
 
-		store, unlock := c.GetStore()
-		defer unlock()
-		require.Contains(t, store, 1)
-		require.Equal(t, "a", store[1].Value)
-		require.Greater(t, *store[1].ExpireAt, time.Now())
+				c.SetEx(1, 1, 1*time.Minute)
+				items, unlock := c.Store().Items()
+				defer unlock()
+				require.Contains(t, items, 1)
+				require.Equal(t, 1, items[1].Value)
+				require.Greater(t, *items[1].ExpireAt, time.Now())
+			})
+		}
+	})
+}
+
+func TestCache_Get(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns value of key & true when key exists in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
+
+				got, ok := c.Get(1)
+				require.True(t, ok)
+				require.Equal(t, 1, got)
+			})
+		}
+	})
+
+	t.Run("returns empty string & false when key does not exist in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				got, ok := c.Get(1)
+				require.False(t, ok)
+				require.Equal(t, 0, got)
+			})
+		}
+	})
+
+	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				expireAt := time.Now()
+				c, _ := newCache(cacheSize, memcache.WithPassiveExpiration[int, int]())
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				got, ok := c.Get(1)
+				require.False(t, ok)
+				require.Equal(t, 0, got)
+			})
+		}
+	})
+
+	t.Run("does not delete expired keys when passive expiration is disabled", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				expireAt := time.Now()
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				got, ok := c.Get(1)
+				require.True(t, ok)
+				require.Equal(t, 1, got)
+			})
+		}
+	})
+}
+
+func TestCache_Has(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns true if key exists in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
+
+				ok := c.Has(1)
+				require.True(t, ok)
+			})
+		}
+	})
+
+	t.Run("returns false when key does not exist in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				ok := c.Has(1)
+				require.False(t, ok)
+			})
+		}
+	})
+
+	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				expireAt := time.Now()
+				c, _ := newCache(cacheSize, memcache.WithPassiveExpiration[int, int]())
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				ok := c.Has(1)
+				require.False(t, ok)
+			})
+		}
+	})
+
+	t.Run("does not delete expired keys when passive expiration is disabled", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				expireAt := time.Now()
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				ok := c.Has(1)
+				require.True(t, ok)
+			})
+		}
 	})
 }
 
@@ -243,33 +337,60 @@ func TestCache_Delete(t *testing.T) {
 	t.Run("successfully deletes key from cache", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		unlock()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		c.Delete(1)
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
 
-		store, unlock = c.GetStore()
-		defer unlock()
-		require.NotContains(t, store, 1)
+				c.Delete(1)
+				items, unlock := store.Items()
+				defer unlock()
+				require.NotContains(t, items, 1)
+			})
+		}
 	})
 
 	t.Run("successfully deletes keys from cache", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		store[2] = memcache.Item[int, string]{Value: "b"}
-		unlock()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		c.Delete(1, 2)
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
+				store.Set(2, memcache.Item[int, int]{Value: 2})
 
-		store, unlock = c.GetStore()
-		defer unlock()
-		require.NotContains(t, store, 1)
-		require.NotContains(t, store, 2)
+				c.Delete(1, 2)
+				items, unlock := store.Items()
+				defer unlock()
+				require.NotContains(t, items, 1)
+				require.NotContains(t, items, 2)
+			})
+		}
+	})
+
+	t.Run("does not panic when deleting keys that do not exist in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				require.NotPanics(t, func() {
+					c.Delete(1, 2)
+				})
+			})
+		}
 	})
 }
 
@@ -279,18 +400,23 @@ func TestCache_Flush(t *testing.T) {
 	t.Run("successfully flushes the cache", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		store[2] = memcache.Item[int, string]{Value: "b"}
-		store[3] = memcache.Item[int, string]{Value: "c"}
-		unlock()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		c.Flush()
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
+				store.Set(2, memcache.Item[int, int]{Value: 2})
+				store.Set(3, memcache.Item[int, int]{Value: 3})
 
-		store, unlock = c.GetStore()
-		defer unlock()
-		require.Empty(t, store)
+				c.Flush()
+				items, unlock := store.Items()
+				defer unlock()
+				require.Empty(t, items)
+			})
+		}
 	})
 }
 
@@ -300,14 +426,21 @@ func TestCache_Size(t *testing.T) {
 	t.Run("returns the size of the cache", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		store[2] = memcache.Item[int, string]{Value: "b"}
-		store[3] = memcache.Item[int, string]{Value: "c"}
-		unlock()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		require.Equal(t, 3, c.Size())
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
+				store.Set(2, memcache.Item[int, int]{Value: 2})
+				store.Set(3, memcache.Item[int, int]{Value: 3})
+
+				size := c.Size()
+				require.Equal(t, 3, size)
+			})
+		}
 	})
 }
 
@@ -317,14 +450,21 @@ func TestCache_Keys(t *testing.T) {
 	t.Run("returns the keys of the cache", func(t *testing.T) {
 		t.Parallel()
 
-		c, _ := memcache.Open[int, string]()
-		store, unlock := c.GetStore()
-		store[1] = memcache.Item[int, string]{Value: "a"}
-		store[2] = memcache.Item[int, string]{Value: "b"}
-		store[3] = memcache.Item[int, string]{Value: "c"}
-		unlock()
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
 
-		require.ElementsMatch(t, []int{1, 2, 3}, c.Keys())
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1})
+				store.Set(2, memcache.Item[int, int]{Value: 1})
+				store.Set(3, memcache.Item[int, int]{Value: 1})
+
+				keys := c.Keys()
+				require.ElementsMatch(t, []int{1, 2, 3}, keys)
+			})
+		}
 	})
 }
 

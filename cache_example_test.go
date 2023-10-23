@@ -33,6 +33,15 @@ func ExampleOpen_withActiveExpiration() {
 	_ = cache
 }
 
+func ExampleOpen_withLRUEviction() {
+	capacity := 10
+	cache, err := memcache.Open[int, string](memcache.WithLRUEviction[int, string](capacity))
+	if err != nil {
+		panic(err)
+	}
+	_ = cache
+}
+
 func ExampleOpen_complete() {
 	interval := 1 * time.Second
 	expirer := memcache.DeleteAllExpiredKeys[int, string]
