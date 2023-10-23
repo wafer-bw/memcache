@@ -2,7 +2,6 @@ package memcache
 
 import (
 	"container/list"
-	"fmt"
 	"sync"
 )
 
@@ -49,10 +48,6 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 		s.list.Remove(element)
 		delete(s.elements, evictKey)
 		delete(s.items, evictKey)
-
-		fmt.Println(len(s.elements))
-		fmt.Println(len(s.items))
-		fmt.Println(s.list.Len())
 	}
 
 	element := s.list.PushFront(key)
