@@ -4,13 +4,10 @@ import (
 	"container/list"
 	"fmt"
 	"sync"
-
-	"github.com/wafer-bw/memcache/internal/closer"
 )
 
 type lruStore[K comparable, V any] struct {
 	mu       *sync.RWMutex
-	closer   *closer.Closer
 	capacity int
 	list     *list.List
 	elements map[K]*list.Element
@@ -18,22 +15,19 @@ type lruStore[K comparable, V any] struct {
 	readerCh chan K
 }
 
-func newLRUStore[K comparable, V any](capacity int, closer *closer.Closer) (lruStore[K, V], error) {
+func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
 	if capacity <= 1 {
 		return lruStore[K, V]{}, ErrInvalidCapacity
 	}
 
 	store := lruStore[K, V]{
 		mu:       &sync.RWMutex{},
-		closer:   closer,
 		capacity: capacity,
 		list:     list.New(),
 		elements: make(map[K]*list.Element, capacity),
 		items:    make(map[K]Item[K, V], capacity),
 		readerCh: make(chan K),
 	}
-
-	go store.reader()
 
 	return store, nil
 }
@@ -67,15 +61,15 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 }
 
 func (s lruStore[K, V]) Get(key K) (Item[K, V], bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	item, ok := s.items[key]
 	if !ok {
 		return Item[K, V]{}, false
 	}
 
-	s.readerCh <- key
+	s.list.MoveToFront(s.elements[key])
 
 	return item, true
 }
@@ -121,17 +115,4 @@ func (s lruStore[K, V]) Size() int {
 	defer s.mu.RUnlock()
 
 	return len(s.items)
-}
-
-func (s lruStore[K, V]) reader() {
-	for {
-		select {
-		case <-s.closer.WaitClosed():
-			return
-		case key := <-s.readerCh:
-			s.mu.Lock()
-			s.list.MoveToFront(s.elements[key])
-			s.mu.Unlock()
-		}
-	}
 }

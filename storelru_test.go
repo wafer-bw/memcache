@@ -5,12 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
-	"github.com/wafer-bw/memcache/internal/closer"
 )
-
-func TestNewLRUStore(t *testing.T) {
-	// TODO: test that the reader ends when the closer is closed
-}
 
 func TestLRUStore_Set(t *testing.T) {
 	t.Parallel()
@@ -18,7 +13,7 @@ func TestLRUStore_Set(t *testing.T) {
 	t.Run("stores key and value in all structures", func(t *testing.T) {
 		t.Parallel()
 
-		store, _ := memcache.NewLRUStore[int, int](2, closer.New())
+		store, _ := memcache.NewLRUStore[int, int](2)
 		store.Underlying.Set(1, memcache.Item[int, int]{Value: 1})
 
 		require.Len(t, store.Items(), 1)
@@ -32,7 +27,7 @@ func TestLRUStore_Set(t *testing.T) {
 	t.Run("evicts least recently used key from all structures", func(t *testing.T) {
 		t.Parallel()
 
-		store, _ := memcache.NewLRUStore[int, int](2, closer.New())
+		store, _ := memcache.NewLRUStore[int, int](2)
 		store.Underlying.Set(1, memcache.Item[int, int]{Value: 1})
 		store.Underlying.Set(2, memcache.Item[int, int]{Value: 2})
 		_, _ = store.Underlying.Get(1)
@@ -52,7 +47,7 @@ func TestLRUStore_Set(t *testing.T) {
 	t.Run("returns an error if capacity is lower than 2", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.NewLRUStore[int, int](1, closer.New())
+		_, err := memcache.NewLRUStore[int, int](1)
 		require.ErrorIs(t, err, memcache.ErrInvalidCapacity)
 	})
 }

@@ -4,8 +4,6 @@ package memcache
 
 import (
 	"container/list"
-
-	"github.com/wafer-bw/memcache/internal/closer"
 )
 
 type UnlockFunc unlockFunc
@@ -30,8 +28,8 @@ type LRUStore[K comparable, V any] struct {
 	Underlying lruStore[K, V]
 }
 
-func NewLRUStore[K comparable, V any](capacity int, closer *closer.Closer) (LRUStore[K, V], error) {
-	store, err := newLRUStore[K, V](capacity, closer)
+func NewLRUStore[K comparable, V any](capacity int) (LRUStore[K, V], error) {
+	store, err := newLRUStore[K, V](capacity)
 	if err != nil {
 		return LRUStore[K, V]{}, err
 	}
