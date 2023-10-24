@@ -25,7 +25,6 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 }
 
 func TestCacheConcurrentAccess(t *testing.T) {
-
 	t.Run("passive expiration disabled", func(t *testing.T) {
 		for policy, newCache := range policies {
 			newCache := newCache

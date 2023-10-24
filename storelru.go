@@ -63,7 +63,7 @@ func (s lruStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
 	if !ok {
 		return Item[K, V]{}, false
 	}
-	
+
 	if activelyExpire && item.IsExpired() {
 		s.list.Remove(s.elements[key])
 		delete(s.elements, key)
