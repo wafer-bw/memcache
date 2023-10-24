@@ -35,7 +35,11 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if len(s.elements) == s.capacity {
+	element := s.list.PushFront(key)
+	s.elements[key] = element
+	s.items[key] = value
+
+	if len(s.elements) > s.capacity {
 		element := s.list.Back()
 		evictKey := element.Value.(K)
 
@@ -49,23 +53,26 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 		delete(s.elements, evictKey)
 		delete(s.items, evictKey)
 	}
-
-	element := s.list.PushFront(key)
-	s.elements[key] = element
-	s.items[key] = value
 }
 
-func (s lruStore[K, V]) Get(key K) (Item[K, V], bool) {
-	s.mu.RLock()
+func (s lruStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	item, ok := s.items[key]
 	if !ok {
 		return Item[K, V]{}, false
 	}
-	s.mu.RUnlock()
+	
+	if activelyExpire && item.IsExpired() {
+		s.list.Remove(s.elements[key])
+		delete(s.elements, key)
+		delete(s.items, key)
 
-	s.mu.Lock()
+		return Item[K, V]{}, false
+	}
+
 	s.list.MoveToFront(s.elements[key])
-	s.mu.Unlock()
 
 	return item, true
 }

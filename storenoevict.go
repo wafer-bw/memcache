@@ -21,12 +21,21 @@ func (s noEvictStore[K, V]) Set(key K, value Item[K, V]) {
 	s.items[key] = value
 }
 
-func (s noEvictStore[K, V]) Get(key K) (Item[K, V], bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s noEvictStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	v, ok := s.items[key]
-	return v, ok
+	item, ok := s.items[key]
+	if !ok {
+		return Item[K, V]{}, false
+	}
+
+	if activelyExpire && item.IsExpired() {
+		delete(s.items, key)
+		return Item[K, V]{}, false
+	}
+
+	return item, ok
 }
 
 func (s noEvictStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {

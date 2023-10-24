@@ -62,13 +62,7 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 // If the cache was opened with [WithPassiveExpiration] and the requested key
 // is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
-	item, ok := c.store.Get(key)
-
-	if ok && c.passiveExpiration && item.IsExpired() {
-		c.Delete(key)
-		var v V
-		return v, false
-	}
+	item, ok := c.store.Get(key, c.passiveExpiration)
 
 	return item.Value, ok
 }
@@ -126,7 +120,7 @@ func (c *Cache[K, V]) runActiveExpirer() {
 		case <-ch:
 			return
 		case <-ticker.C:
-			// TODO: this locks the store for the entire duration of the expirer
+			// TODO: this locks the store for the entire duration of the expirer.
 			items, unlock := c.store.Items()
 			c.expirer(items)
 			unlock()
@@ -137,7 +131,7 @@ func (c *Cache[K, V]) runActiveExpirer() {
 // storer is the interface depended upon by a cache.
 type storer[K comparable, V any] interface {
 	Set(key K, value Item[K, V])
-	Get(key K) (Item[K, V], bool)
+	Get(key K, activelyExpire bool) (Item[K, V], bool)
 	Delete(keys ...K)
 	Items() (map[K]Item[K, V], unlockFunc)
 	Size() int
