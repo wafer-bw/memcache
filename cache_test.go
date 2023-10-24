@@ -2,7 +2,9 @@ package memcache_test
 
 import (
 	"errors"
+	"math/rand"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,6 +22,66 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 		options = append(options, memcache.WithLRUEviction[int, int](size))
 		return memcache.Open[int, int](options...)
 	},
+}
+
+func TestCacheConcurrentAccess(t *testing.T) {
+	t.Run("passive expiration disabled", func(t *testing.T) {
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				n := 1000
+				cache, _ := newCache(n)
+
+				for i := 0; i < n; i++ {
+					cache.Set(i, i)
+				}
+
+				var wg sync.WaitGroup
+				for i := 0; i < n; i++ {
+					wg.Add(1)
+					go func(i int) {
+						defer wg.Done()
+						_, _ = cache.Get(i)
+						cache.Set(i, i*2)
+					}(i)
+				}
+				wg.Wait()
+
+				for i := 0; i < n; i++ {
+					value, ok := cache.Get(i)
+					require.True(t, ok, i)
+					require.Equal(t, i*2, value)
+				}
+			})
+		}
+	})
+
+	t.Run("passive expiration enabled", func(t *testing.T) {
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				n := 1000
+				n2 := n * 2
+				cache, _ := newCache(n, memcache.WithPassiveExpiration[int, int]())
+
+				for i := 0; i < n; i++ {
+					cache.SetEx(i, i, 1*time.Millisecond)
+				}
+
+				var wg sync.WaitGroup
+				for i := 0; i < n2; i++ {
+					wg.Add(1)
+					go func(i int) {
+						v := rand.Intn(n2 - 1)
+						defer wg.Done()
+						cache.Get(v)
+						cache.SetEx(v, 1, 1*time.Millisecond)
+					}(i)
+				}
+				wg.Wait()
+			})
+		}
+	})
 }
 
 func TestNew(t *testing.T) {

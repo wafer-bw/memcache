@@ -30,7 +30,7 @@ func TestLRUStore_Set(t *testing.T) {
 		store, _ := memcache.NewLRUStore[int, int](2)
 		store.Underlying.Set(1, memcache.Item[int, int]{Value: 1})
 		store.Underlying.Set(2, memcache.Item[int, int]{Value: 2})
-		_, _ = store.Underlying.Get(1)
+		_, _ = store.Underlying.Get(1, false)
 		store.Underlying.Set(3, memcache.Item[int, int]{Value: 3})
 
 		require.Len(t, store.Items(), 2)
