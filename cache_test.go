@@ -524,7 +524,9 @@ func TestCache_Keys(t *testing.T) {
 				store.Set(3, memcache.Item[int, int]{Value: 1})
 
 				keys := c.Keys()
-				require.ElementsMatch(t, []int{1, 2, 3}, keys)
+				require.Contains(t, keys, 1)
+				require.Contains(t, keys, 2)
+				require.Contains(t, keys, 3)
 			})
 		}
 	})

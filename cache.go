@@ -83,7 +83,7 @@ func (c *Cache[K, V]) Delete(keys ...K) {
 
 // Flush the cache, deleting all keys.
 func (c *Cache[K, V]) Flush() {
-	c.store.Clear()
+	c.store.Flush()
 }
 
 // Size returns the number of items currently in the cache.
@@ -91,17 +91,9 @@ func (c *Cache[K, V]) Size() int {
 	return c.store.Size()
 }
 
-// Keys returns a slice of all keys currently in the cache.
-func (c *Cache[K, V]) Keys() []K {
-	items, unlock := c.store.Items()
-	defer unlock()
-
-	keys := make([]K, 0, len(items))
-	for key := range items {
-		keys = append(keys, key)
-	}
-
-	return keys
+// Keys returns a map of all keys currently in the cache.
+func (c *Cache[K, V]) Keys() map[K]struct{} {
+	return c.store.Keys()
 }
 
 // Close the cache, stopping all running goroutines. Should be called when the
@@ -134,9 +126,10 @@ type storer[K comparable, V any] interface {
 	Get(key K, activelyExpire bool) (Item[K, V], bool)
 	Delete(keys ...K)
 	Items() (map[K]Item[K, V], unlockFunc)
+	Keys() map[K]struct{}
 	Size() int
-	Clear()
+	Flush()
 }
 
-// unlockFunc unlockes the mutex for the cache store.
+// unlockFunc unlocks the mutex for the cache store.
 type unlockFunc func()

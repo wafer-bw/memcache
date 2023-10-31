@@ -8,10 +8,11 @@ import (
 type lruStore[K comparable, V any] struct {
 	mu       *sync.RWMutex
 	capacity int
+
 	list     *list.List
 	elements map[K]*list.Element
 	items    map[K]Item[K, V]
-	readerCh chan K
+	keys     map[K]struct{}
 }
 
 func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
@@ -25,7 +26,7 @@ func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
 		list:     list.New(),
 		elements: make(map[K]*list.Element, capacity),
 		items:    make(map[K]Item[K, V], capacity),
-		readerCh: make(chan K),
+		keys:     make(map[K]struct{}, capacity),
 	}
 
 	return store, nil
@@ -38,6 +39,7 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 	element := s.list.PushFront(key)
 	s.elements[key] = element
 	s.items[key] = value
+	s.keys[key] = struct{}{}
 
 	if len(s.elements) > s.capacity {
 		element := s.list.Back()
@@ -52,6 +54,7 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 		s.list.Remove(element)
 		delete(s.elements, evictKey)
 		delete(s.items, evictKey)
+		delete(s.keys, evictKey)
 	}
 }
 
@@ -68,6 +71,7 @@ func (s lruStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
 		s.list.Remove(s.elements[key])
 		delete(s.elements, key)
 		delete(s.items, key)
+		delete(s.keys, key)
 
 		return Item[K, V]{}, false
 	}
@@ -80,6 +84,13 @@ func (s lruStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
 func (s lruStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
 	s.mu.Lock()
 	return s.items, s.mu.Unlock
+}
+
+func (s lruStore[K, V]) Keys() map[K]struct{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.keys
 }
 
 func (s lruStore[K, V]) Delete(keys ...K) {
@@ -95,10 +106,11 @@ func (s lruStore[K, V]) Delete(keys ...K) {
 		s.list.Remove(element)
 		delete(s.elements, key)
 		delete(s.items, key)
+		delete(s.keys, key)
 	}
 }
 
-func (s lruStore[K, V]) Clear() {
+func (s lruStore[K, V]) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -111,6 +123,7 @@ func (s lruStore[K, V]) Clear() {
 	s.list.Init()
 	clear(s.elements)
 	clear(s.items)
+	clear(s.keys)
 }
 
 func (s lruStore[K, V]) Size() int {

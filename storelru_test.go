@@ -19,9 +19,12 @@ func TestLRUStore_Set(t *testing.T) {
 		require.Len(t, store.Items(), 1)
 		require.Len(t, store.Elements(), 1)
 		require.Equal(t, 1, store.List().Len())
+		require.Len(t, store.Keys(), 1)
+
 		require.Equal(t, 1, store.Items()[1].Value)
 		require.Equal(t, 1, store.Elements()[1].Value)
 		require.Equal(t, store.Elements()[1], store.List().Front())
+		require.Equal(t, struct{}{}, store.Keys()[1])
 	})
 
 	t.Run("evicts least recently used key from all structures", func(t *testing.T) {
@@ -36,12 +39,16 @@ func TestLRUStore_Set(t *testing.T) {
 		require.Len(t, store.Items(), 2)
 		require.Len(t, store.Elements(), 2)
 		require.Equal(t, 2, store.List().Len())
+		require.Len(t, store.Keys(), 2)
+
 		require.Equal(t, 1, store.Items()[1].Value)
 		require.Equal(t, 3, store.Items()[3].Value)
 		require.Equal(t, 1, store.Elements()[1].Value)
 		require.Equal(t, 3, store.Elements()[3].Value)
-		require.Equal(t, store.Elements()[3], store.List().Front())
 		require.Equal(t, store.Elements()[1], store.List().Front().Next())
+		require.Equal(t, store.Elements()[3], store.List().Front())
+		require.Equal(t, struct{}{}, store.Keys()[1])
+		require.Equal(t, struct{}{}, store.Keys()[3])
 	})
 
 	t.Run("returns an error if capacity is lower than 2", func(t *testing.T) {

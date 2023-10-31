@@ -43,6 +43,10 @@ func (s LRUStore[K, V]) Items() map[K]Item[K, V] {
 	return s.Underlying.items
 }
 
+func (s LRUStore[K, V]) Keys() map[K]struct{} {
+	return s.Underlying.keys
+}
+
 func (s LRUStore[K, V]) Elements() map[K]*list.Element {
 	return s.Underlying.elements
 }
@@ -63,4 +67,8 @@ func NewNoEvictStore[K comparable, V any]() NoEvictStore[K, V] {
 
 func (s NoEvictStore[K, V]) Items() map[K]Item[K, V] {
 	return s.Underlying.items
+}
+
+func (s NoEvictStore[K, V]) Keys() map[K]struct{} {
+	return s.Underlying.keys
 }

@@ -17,6 +17,9 @@ func TestNoEvictStore_Set(t *testing.T) {
 		store.Underlying.Set(1, memcache.Item[int, int]{Value: 1})
 
 		require.Len(t, store.Items(), 1)
+		require.Len(t, store.Keys(), 1)
+
 		require.Equal(t, 1, store.Items()[1].Value)
+		require.Equal(t, struct{}{}, store.Keys()[1])
 	})
 }
