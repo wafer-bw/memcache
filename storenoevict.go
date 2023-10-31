@@ -24,16 +24,25 @@ func (s noEvictStore[K, V]) Set(key K, value Item[K, V]) {
 	s.keys[key] = struct{}{}
 }
 
-func (s noEvictStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s noEvictStore[K, V]) Get(key K, passivelyExpire bool) (Item[K, V], bool) {
+	if passivelyExpire {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+	} else {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+	}
 
 	item, ok := s.items[key]
 	if !ok {
 		return Item[K, V]{}, false
 	}
 
-	if activelyExpire && item.IsExpired() {
+	if item.IsExpired() {
+		if passivelyExpire {
+			delete(s.items, key)
+			delete(s.keys, key)
+		}
 		return Item[K, V]{}, false
 	}
 

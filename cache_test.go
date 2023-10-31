@@ -276,6 +276,26 @@ func TestCache_Get(t *testing.T) {
 		}
 	})
 
+	t.Run("returns empty string & false when expired key exists in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				expireAt := time.Now()
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				got, ok := c.Get(1)
+				require.False(t, ok)
+				require.Equal(t, 0, got)
+			})
+		}
+	})
+
 	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
 		t.Parallel()
 
@@ -289,9 +309,12 @@ func TestCache_Get(t *testing.T) {
 				store := c.Store()
 				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
 
-				got, ok := c.Get(1)
+				_, ok := c.Get(1)
 				require.False(t, ok)
-				require.Equal(t, 0, got)
+
+				items, unlock := store.Items()
+				defer unlock()
+				require.NotContains(t, items, 1)
 			})
 		}
 	})
@@ -309,9 +332,12 @@ func TestCache_Get(t *testing.T) {
 				store := c.Store()
 				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
 
-				got, ok := c.Get(1)
-				require.True(t, ok)
-				require.Equal(t, 1, got)
+				_, ok := c.Get(1)
+				require.False(t, ok)
+
+				items, unlock := store.Items()
+				defer unlock()
+				require.Contains(t, items, 1)
 			})
 		}
 	})
@@ -354,6 +380,25 @@ func TestCache_Has(t *testing.T) {
 		}
 	})
 
+	t.Run("returns false when expired key exists in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				expireAt := time.Now()
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				ok := c.Has(1)
+				require.False(t, ok)
+			})
+		}
+	})
+
 	t.Run("deletes expired keys when passive expiration is enabled", func(t *testing.T) {
 		t.Parallel()
 
@@ -369,6 +414,10 @@ func TestCache_Has(t *testing.T) {
 
 				ok := c.Has(1)
 				require.False(t, ok)
+
+				items, unlock := store.Items()
+				defer unlock()
+				require.NotContains(t, items, 1)
 			})
 		}
 	})
@@ -387,7 +436,11 @@ func TestCache_Has(t *testing.T) {
 				store.Set(1, memcache.Item[int, int]{Value: 1, ExpireAt: &expireAt})
 
 				ok := c.Has(1)
-				require.True(t, ok)
+				require.False(t, ok)
+
+				items, unlock := store.Items()
+				defer unlock()
+				require.Contains(t, items, 1)
 			})
 		}
 	})

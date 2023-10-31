@@ -58,7 +58,7 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 	}
 }
 
-func (s lruStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
+func (s lruStore[K, V]) Get(key K, passivelyExpire bool) (Item[K, V], bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -67,11 +67,13 @@ func (s lruStore[K, V]) Get(key K, activelyExpire bool) (Item[K, V], bool) {
 		return Item[K, V]{}, false
 	}
 
-	if activelyExpire && item.IsExpired() {
-		s.list.Remove(s.elements[key])
-		delete(s.elements, key)
-		delete(s.items, key)
-		delete(s.keys, key)
+	if item.IsExpired() {
+		if passivelyExpire {
+			s.list.Remove(s.elements[key])
+			delete(s.elements, key)
+			delete(s.items, key)
+			delete(s.keys, key)
+		}
 
 		return Item[K, V]{}, false
 	}
