@@ -123,7 +123,7 @@ func (c *Cache[K, V]) runActiveExpirer() {
 // storer is the interface depended upon by a cache.
 type storer[K comparable, V any] interface {
 	Set(key K, value Item[K, V])
-	Get(key K, activelyExpire bool) (Item[K, V], bool)
+	Get(key K, deleteExpired bool) (Item[K, V], bool)
 	Delete(keys ...K)
 	Items() (map[K]Item[K, V], unlockFunc)
 	Keys() map[K]struct{}
