@@ -6,9 +6,9 @@ import (
 )
 
 type lruStore[K comparable, V any] struct {
-	mu       *sync.RWMutex
-	capacity int
+	*sync.RWMutex
 
+	capacity int
 	list     *list.List
 	elements map[K]*list.Element
 	items    map[K]Item[K, V]
@@ -21,7 +21,7 @@ func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
 	}
 
 	store := lruStore[K, V]{
-		mu:       &sync.RWMutex{},
+		RWMutex:  &sync.RWMutex{},
 		capacity: capacity,
 		list:     list.New(),
 		elements: make(map[K]*list.Element, capacity),
@@ -33,8 +33,8 @@ func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
 }
 
 func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	element := s.list.PushFront(key)
 	s.elements[key] = element
@@ -59,8 +59,8 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 }
 
 func (s lruStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	item, ok := s.items[key]
 	if !ok {
@@ -84,20 +84,20 @@ func (s lruStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 }
 
 func (s lruStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
-	s.mu.Lock()
-	return s.items, s.mu.Unlock
+	s.Lock()
+	return s.items, s.Unlock
 }
 
 func (s lruStore[K, V]) Keys() map[K]struct{} {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.RLock()
+	defer s.RUnlock()
 
 	return s.keys
 }
 
 func (s lruStore[K, V]) Delete(keys ...K) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	for _, key := range keys {
 		element, ok := s.elements[key]
@@ -113,8 +113,8 @@ func (s lruStore[K, V]) Delete(keys ...K) {
 }
 
 func (s lruStore[K, V]) Flush() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	// TODO: call every item's OnEvicted:
 	// item := s.items[key]
@@ -129,8 +129,8 @@ func (s lruStore[K, V]) Flush() {
 }
 
 func (s lruStore[K, V]) Size() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.RLock()
+	defer s.RUnlock()
 
 	return len(s.items)
 }
