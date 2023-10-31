@@ -42,12 +42,6 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 		element := s.list.Back()
 		evictKey := element.Value.(K)
 
-		// TODO: call item.OnEvicted:
-		// item := s.items[key]
-		// if item.OnEvicted != nil {
-		// 	item.OnEvicted(key, item.Value)
-		// }
-
 		s.list.Remove(element)
 		delete(s.elements, evictKey)
 		delete(s.items, evictKey)
@@ -112,12 +106,6 @@ func (s lruStore[K, V]) Delete(keys ...K) {
 func (s lruStore[K, V]) Flush() {
 	s.Lock()
 	defer s.Unlock()
-
-	// TODO: call every item's OnEvicted:
-	// item := s.items[key]
-	// if item.OnEvicted != nil {
-	// 	item.OnEvicted(key, item.Value)
-	// }
 
 	s.list.Init()
 	clear(s.elements)
