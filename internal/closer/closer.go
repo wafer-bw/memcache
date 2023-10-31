@@ -3,15 +3,12 @@ package closer
 import "sync"
 
 type Closer struct {
-	mu *sync.RWMutex
+	mu sync.RWMutex
 	ch chan struct{}
 }
 
 func New() *Closer {
-	return &Closer{
-		mu: &sync.RWMutex{},
-		ch: make(chan struct{}),
-	}
+	return &Closer{ch: make(chan struct{})}
 }
 
 func (c *Closer) WaitClosed() <-chan struct{} {

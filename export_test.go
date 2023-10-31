@@ -26,7 +26,7 @@ func (c *Cache[K, V]) Closed() bool {
 }
 
 type LRUStore[K comparable, V any] struct {
-	Underlying lruStore[K, V]
+	Underlying *lruStore[K, V]
 }
 
 func NewLRUStore[K comparable, V any](capacity int) (LRUStore[K, V], error) {
@@ -57,7 +57,7 @@ func (s LRUStore[K, V]) List() *list.List {
 }
 
 type NoEvictStore[K comparable, V any] struct {
-	Underlying noEvictStore[K, V]
+	Underlying *noEvictStore[K, V]
 }
 
 func NewNoEvictStore[K comparable, V any]() NoEvictStore[K, V] {
@@ -66,7 +66,7 @@ func NewNoEvictStore[K comparable, V any]() NoEvictStore[K, V] {
 	}
 }
 
-func (s NoEvictStore[K, V]) Items() map[K]Item[K, V] {
+func (s *NoEvictStore[K, V]) Items() map[K]Item[K, V] {
 	return s.Underlying.items
 }
 

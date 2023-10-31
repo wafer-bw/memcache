@@ -3,32 +3,31 @@ package memcache
 import "sync"
 
 type noEvictStore[K comparable, V any] struct {
-	*sync.RWMutex
+	mu sync.RWMutex
 
 	items map[K]Item[K, V]
 }
 
-func newNoEvictStore[K comparable, V any]() noEvictStore[K, V] {
-	return noEvictStore[K, V]{
-		RWMutex: &sync.RWMutex{},
-		items:   make(map[K]Item[K, V]),
+func newNoEvictStore[K comparable, V any]() *noEvictStore[K, V] {
+	return &noEvictStore[K, V]{
+		items: make(map[K]Item[K, V]),
 	}
 }
 
-func (s noEvictStore[K, V]) Set(key K, value Item[K, V]) {
-	s.Lock()
-	defer s.Unlock()
+func (s *noEvictStore[K, V]) Set(key K, value Item[K, V]) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.items[key] = value
 }
 
-func (s noEvictStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
+func (s *noEvictStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 	if deleteExpired {
-		s.Lock()
-		defer s.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 	} else {
-		s.RLock()
-		defer s.RUnlock()
+		s.mu.RLock()
+		defer s.mu.RUnlock()
 	}
 
 	item, ok := s.items[key]
@@ -44,15 +43,15 @@ func (s noEvictStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 	return item, ok
 }
 
-func (s noEvictStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
-	s.Lock()
+func (s *noEvictStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
+	s.mu.Lock()
 
-	return s.items, s.Unlock
+	return s.items, s.mu.Unlock
 }
 
-func (s noEvictStore[K, V]) Keys() []K {
-	s.RLock()
-	defer s.RUnlock()
+func (s *noEvictStore[K, V]) Keys() []K {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	keys := make([]K, 0, len(s.items))
 	for key := range s.items {
@@ -62,25 +61,25 @@ func (s noEvictStore[K, V]) Keys() []K {
 	return keys
 }
 
-func (s noEvictStore[K, V]) Delete(keys ...K) {
-	s.Lock()
-	defer s.Unlock()
+func (s *noEvictStore[K, V]) Delete(keys ...K) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for _, key := range keys {
 		delete(s.items, key)
 	}
 }
 
-func (s noEvictStore[K, V]) Flush() {
-	s.Lock()
-	defer s.Unlock()
+func (s *noEvictStore[K, V]) Flush() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	clear(s.items)
 }
 
-func (s noEvictStore[K, V]) Size() int {
-	s.RLock()
-	defer s.RUnlock()
+func (s *noEvictStore[K, V]) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	return len(s.items)
 }
