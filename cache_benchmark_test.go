@@ -18,7 +18,7 @@ func BenchmarkCache_Set(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					cache.Set(i%size, i%size)
 				}
@@ -38,7 +38,7 @@ func BenchmarkCache_Get(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					_, _ = cache.Get(i % size)
 				}
@@ -77,7 +77,7 @@ func BenchmarkCache_Has(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					_ = cache.Has(i % size)
 				}
@@ -97,7 +97,7 @@ func BenchmarkCache_Delete(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					cache.Delete(i % size)
 				}
@@ -117,7 +117,7 @@ func BenchmarkCache_Flush(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					cache.Flush()
 				}
@@ -137,7 +137,7 @@ func BenchmarkCache_Size(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					_ = cache.Size()
 				}
@@ -157,7 +157,7 @@ func BenchmarkCache_Items(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					_, unlock := cache.Store().Items()
 					unlock()
@@ -178,7 +178,7 @@ func BenchmarkCache_Keys(b *testing.B) {
 				cache.Set(i, i)
 			}
 
-			b.Run(fmt.Sprintf("%d items %s policy", size, policy), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					_ = cache.Keys()
 				}
