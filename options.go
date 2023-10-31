@@ -20,25 +20,19 @@ func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 	}
 }
 
-// WithActiveExpiration enables the active deletion of expired keys by running
-// the provided expirer function at the provided interval.
+// WithActiveExpiration enables the active deletion of expired keys.
 //
 // This can be combined with [WithPassiveExpiration] to enable both passive and
 // active expiration of keys.
 //
 // See [Open] for example usage.
-func WithActiveExpiration[K comparable, V any](f ExpirerFunc[K, V], interval time.Duration) Option[K, V] {
-	// TODO: consider accepting an interface instead of a type
-
+func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		if f == nil {
-			return ErrNilExpirerFunc
-		} else if interval <= 0 {
+		if interval <= 0 {
 			return ErrInvalidInterval
 		}
 
-		c.expirationInterval = interval
-		c.expirer = f
+		c.activeExpirationInterval = interval
 		return nil
 	}
 }

@@ -3,4 +3,6 @@ package memcache
 
 // TODO:
 // - Determine if cache & closer need to be constructed as pointers or not.
-// - Replace Items with something more efficient that reads one at a time.
+// - Update tests to use Items() to set state instead of exported methods.
+// - Separate concerns of store vs top level cache. Is the cache just a wrapper
+//   or does it have its own behavior to add?

@@ -36,10 +36,8 @@ func (s noEvictStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 		return Item[K, V]{}, false
 	}
 
-	if item.IsExpired() {
-		if deleteExpired {
-			delete(s.items, key)
-		}
+	if item.IsExpired() && deleteExpired {
+		delete(s.items, key)
 		return Item[K, V]{}, false
 	}
 

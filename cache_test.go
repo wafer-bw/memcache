@@ -24,7 +24,7 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 	},
 }
 
-func TestCacheConcurrentAccess(t *testing.T) {
+func TestCache_concurrentAccess(t *testing.T) {
 	t.Run("passive expiration disabled", func(t *testing.T) {
 		for policy, newCache := range policies {
 			newCache := newCache
@@ -84,6 +84,29 @@ func TestCacheConcurrentAccess(t *testing.T) {
 	})
 }
 
+func TestCache_activeExpiration(t *testing.T) {
+	t.Parallel()
+
+	t.Run("deletes expired keys", func(t *testing.T) {
+		t.Parallel()
+
+		ttl := 1 * time.Millisecond
+
+		cache, _ := memcache.Open(memcache.WithActiveExpiration[int, int](1 * time.Millisecond))
+		defer cache.Close()
+
+		cache.SetEx(1, 1, ttl)
+		cache.SetEx(2, 2, ttl)
+		cache.SetEx(3, 3, ttl)
+
+		time.Sleep(2 * ttl)
+
+		items, unlock := cache.Store().Items()
+		defer unlock()
+		require.Empty(t, items)
+	})
+}
+
 func TestNew(t *testing.T) {
 	t.Parallel()
 
@@ -108,7 +131,8 @@ func TestNew(t *testing.T) {
 	t.Run("returns an error when an option returns an error", func(t *testing.T) {
 		t.Parallel()
 
-		var errDummy error = errors.New("dummy")
+		errDummy := errors.New("dummy")
+
 		c, err := memcache.Open[int, string](func(c *memcache.Cache[int, string]) error { return errDummy })
 		require.ErrorIs(t, err, errDummy)
 		require.Nil(t, c)
@@ -122,39 +146,21 @@ func TestNew(t *testing.T) {
 		require.True(t, c.PassiveExpiration())
 	})
 
-	t.Run("with expirer sets and runs the expirer", func(t *testing.T) {
+	t.Run("with active expiration enables active expiration", func(t *testing.T) {
 		t.Parallel()
 
-		// TODO: once expirer func is an interface use a mock to expect call.
-
-		ch := make(chan struct{})
 		interval := 25 * time.Millisecond
-		expirer := func(items map[int]memcache.Item[int, string]) {
-			close(ch)
-		}
 
-		c, _ := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](expirer, interval))
+		c, err := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](interval))
+		require.NoError(t, err)
 		defer c.Close()
-
-		select {
-		case <-time.After(interval * 2):
-			t.Fatal("expirer was not called")
-		case <-ch:
-			// expirer was called
-		}
+		require.Equal(t, interval, c.ExpirationInterval())
 	})
 
-	t.Run("with expirer returns an error if the expirer function is nil", func(t *testing.T) {
+	t.Run("with active expiration returns an error if the interval is less than or equal to 0", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](nil, 1*time.Second))
-		require.ErrorIs(t, err, memcache.ErrNilExpirerFunc)
-	})
-
-	t.Run("with expirer returns an error if the interval is less than or equal to 0", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](memcache.DeleteAllExpiredKeys, 0))
+		_, err := memcache.Open[int, int](memcache.WithActiveExpiration[int, int](0 * time.Second))
 		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
 
@@ -638,8 +644,7 @@ func TestCache_Close(t *testing.T) {
 
 		cache := func() *memcache.Cache[int, string] {
 			interval := 1 * time.Second
-			expirer := memcache.DeleteAllExpiredKeys[int, string]
-			c, _ := memcache.Open[int, string](memcache.WithActiveExpiration(expirer, interval))
+			c, _ := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](interval))
 			runtime.SetFinalizer(c, func(_ *memcache.Cache[int, string]) {
 				close(ch)
 			})

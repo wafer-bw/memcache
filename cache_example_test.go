@@ -20,17 +20,16 @@ func ExampleOpen_withPassiveExpiration() {
 	if err != nil {
 		panic(err)
 	}
-	_ = cache
+	defer cache.Close()
 }
 
 func ExampleOpen_withActiveExpiration() {
 	interval := 1 * time.Second
-	expirer := memcache.DeleteAllExpiredKeys[int, string]
-	cache, err := memcache.Open[int, string](memcache.WithActiveExpiration(expirer, interval))
+	cache, err := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](interval))
 	if err != nil {
 		panic(err)
 	}
-	_ = cache
+	defer cache.Close()
 }
 
 func ExampleOpen_withLRUEviction() {
@@ -39,20 +38,20 @@ func ExampleOpen_withLRUEviction() {
 	if err != nil {
 		panic(err)
 	}
-	_ = cache
+	defer cache.Close()
 }
 
 func ExampleOpen_complete() {
 	interval := 1 * time.Second
-	expirer := memcache.DeleteAllExpiredKeys[int, string]
 	cache, err := memcache.Open[int, string](
-		memcache.WithActiveExpiration(expirer, interval),
+		memcache.WithActiveExpiration[int, string](interval),
 		memcache.WithPassiveExpiration[int, string](),
+		memcache.WithLRUEviction[int, string](10),
 	)
 	if err != nil {
 		panic(err)
 	}
-	_ = cache
+	defer cache.Close()
 }
 
 func ExampleCache_Set() {

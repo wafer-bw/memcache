@@ -16,9 +16,8 @@ type Cache[K comparable, V any] struct {
 	store  storer[K, V]
 	closer *closer.Closer
 
-	passiveExpiration  bool
-	expirationInterval time.Duration
-	expirer            ExpirerFunc[K, V]
+	passiveExpiration        bool
+	activeExpirationInterval time.Duration
 }
 
 // Open a new in-memory key-value cache.
@@ -37,7 +36,7 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 		}
 	}
 
-	if cache.expirer != nil && cache.expirationInterval > 0 {
+	if cache.activeExpirationInterval > 0 {
 		go cache.runActiveExpirer()
 	}
 
@@ -63,6 +62,10 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 // is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	item, ok := c.store.Get(key, c.passiveExpiration)
+	if !ok || item.IsExpired() {
+		var v V
+		return v, false
+	}
 
 	return item.Value, ok
 }
@@ -104,7 +107,7 @@ func (c *Cache[K, V]) Close() {
 
 func (c *Cache[K, V]) runActiveExpirer() {
 	closerCh := c.closer.WaitClosed()
-	ticker := time.NewTicker(c.expirationInterval)
+	ticker := time.NewTicker(c.activeExpirationInterval)
 	defer ticker.Stop()
 
 	for {
@@ -112,12 +115,21 @@ func (c *Cache[K, V]) runActiveExpirer() {
 		case <-closerCh:
 			return
 		case <-ticker.C:
-			// TODO: this locks the store for the entire duration of the expirer.
-			items, unlock := c.store.Items()
-			c.expirer(items)
-			unlock()
+			deleteAllExpiredKeys(c.store)
 		}
 	}
+}
+
+// deleteAllExpiredKeys from the provided store.
+func deleteAllExpiredKeys[K comparable, V any](store storer[K, V]) {
+	keys := store.Keys()
+	expireKeys := make([]K, 0, len(keys))
+	for _, key := range keys {
+		if item, ok := store.Get(key, false); ok && item.IsExpired() {
+			expireKeys = append(expireKeys, key)
+		}
+	}
+	store.Delete(expireKeys...)
 }
 
 // storer is the interface depended upon by a cache.

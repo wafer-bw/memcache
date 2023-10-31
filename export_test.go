@@ -4,6 +4,7 @@ package memcache
 
 import (
 	"container/list"
+	"time"
 )
 
 type UnlockFunc unlockFunc
@@ -16,12 +17,12 @@ func (c *Cache[K, V]) PassiveExpiration() bool {
 	return c.passiveExpiration
 }
 
-func (c *Cache[K, V]) Closed() bool {
-	return c.closer.Closed()
+func (c *Cache[K, V]) ExpirationInterval() time.Duration {
+	return c.activeExpirationInterval
 }
 
-func (c *Cache[K, V]) Expirer() ExpirerFunc[K, V] {
-	return c.expirer
+func (c *Cache[K, V]) Closed() bool {
+	return c.closer.Closed()
 }
 
 type LRUStore[K comparable, V any] struct {
@@ -71,4 +72,8 @@ func (s NoEvictStore[K, V]) Items() map[K]Item[K, V] {
 
 func (s NoEvictStore[K, V]) Keys() []K {
 	return s.Underlying.Keys()
+}
+
+func DeleteAllExpiredKeys[K comparable, V any](store storer[K, V]) {
+	deleteAllExpiredKeys[K, V](store)
 }
