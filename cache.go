@@ -103,13 +103,13 @@ func (c *Cache[K, V]) Close() {
 }
 
 func (c *Cache[K, V]) runActiveExpirer() {
-	ch := c.closer.WaitClosed()
+	closerCh := c.closer.WaitClosed()
 	ticker := time.NewTicker(c.expirationInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ch:
+		case <-closerCh:
 			return
 		case <-ticker.C:
 			// TODO: this locks the store for the entire duration of the expirer.
