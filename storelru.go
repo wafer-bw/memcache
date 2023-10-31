@@ -12,7 +12,6 @@ type lruStore[K comparable, V any] struct {
 	list     *list.List
 	elements map[K]*list.Element
 	items    map[K]Item[K, V]
-	keys     map[K]struct{}
 }
 
 func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
@@ -26,7 +25,6 @@ func newLRUStore[K comparable, V any](capacity int) (lruStore[K, V], error) {
 		list:     list.New(),
 		elements: make(map[K]*list.Element, capacity),
 		items:    make(map[K]Item[K, V], capacity),
-		keys:     make(map[K]struct{}, capacity),
 	}
 
 	return store, nil
@@ -39,7 +37,6 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 	element := s.list.PushFront(key)
 	s.elements[key] = element
 	s.items[key] = value
-	s.keys[key] = struct{}{}
 
 	if len(s.elements) > s.capacity {
 		element := s.list.Back()
@@ -54,7 +51,6 @@ func (s lruStore[K, V]) Set(key K, value Item[K, V]) {
 		s.list.Remove(element)
 		delete(s.elements, evictKey)
 		delete(s.items, evictKey)
-		delete(s.keys, evictKey)
 	}
 }
 
@@ -72,7 +68,6 @@ func (s lruStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 			s.list.Remove(s.elements[key])
 			delete(s.elements, key)
 			delete(s.items, key)
-			delete(s.keys, key)
 		}
 
 		return Item[K, V]{}, false
@@ -88,11 +83,16 @@ func (s lruStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
 	return s.items, s.Unlock
 }
 
-func (s lruStore[K, V]) Keys() map[K]struct{} {
+func (s lruStore[K, V]) Keys() []K {
 	s.RLock()
 	defer s.RUnlock()
 
-	return s.keys
+	keys := make([]K, 0, len(s.items))
+	for key := range s.items {
+		keys = append(keys, key)
+	}
+
+	return keys
 }
 
 func (s lruStore[K, V]) Delete(keys ...K) {
@@ -108,7 +108,6 @@ func (s lruStore[K, V]) Delete(keys ...K) {
 		s.list.Remove(element)
 		delete(s.elements, key)
 		delete(s.items, key)
-		delete(s.keys, key)
 	}
 }
 
@@ -125,7 +124,6 @@ func (s lruStore[K, V]) Flush() {
 	s.list.Init()
 	clear(s.elements)
 	clear(s.items)
-	clear(s.keys)
 }
 
 func (s lruStore[K, V]) Size() int {

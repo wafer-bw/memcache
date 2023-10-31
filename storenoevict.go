@@ -6,14 +6,12 @@ type noEvictStore[K comparable, V any] struct {
 	*sync.RWMutex
 
 	items map[K]Item[K, V]
-	keys  map[K]struct{}
 }
 
 func newNoEvictStore[K comparable, V any]() noEvictStore[K, V] {
 	return noEvictStore[K, V]{
 		RWMutex: &sync.RWMutex{},
 		items:   make(map[K]Item[K, V]),
-		keys:    make(map[K]struct{}),
 	}
 }
 
@@ -22,7 +20,6 @@ func (s noEvictStore[K, V]) Set(key K, value Item[K, V]) {
 	defer s.Unlock()
 
 	s.items[key] = value
-	s.keys[key] = struct{}{}
 }
 
 func (s noEvictStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
@@ -42,7 +39,6 @@ func (s noEvictStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 	if item.IsExpired() {
 		if deleteExpired {
 			delete(s.items, key)
-			delete(s.keys, key)
 		}
 		return Item[K, V]{}, false
 	}
@@ -56,11 +52,16 @@ func (s noEvictStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
 	return s.items, s.Unlock
 }
 
-func (s noEvictStore[K, V]) Keys() map[K]struct{} {
+func (s noEvictStore[K, V]) Keys() []K {
 	s.RLock()
 	defer s.RUnlock()
 
-	return s.keys
+	keys := make([]K, 0, len(s.items))
+	for key := range s.items {
+		keys = append(keys, key)
+	}
+
+	return keys
 }
 
 func (s noEvictStore[K, V]) Delete(keys ...K) {
@@ -69,7 +70,6 @@ func (s noEvictStore[K, V]) Delete(keys ...K) {
 
 	for _, key := range keys {
 		delete(s.items, key)
-		delete(s.keys, key)
 	}
 }
 
@@ -78,7 +78,6 @@ func (s noEvictStore[K, V]) Flush() {
 	defer s.Unlock()
 
 	clear(s.items)
-	clear(s.keys)
 }
 
 func (s noEvictStore[K, V]) Size() int {

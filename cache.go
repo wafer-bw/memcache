@@ -92,7 +92,7 @@ func (c *Cache[K, V]) Size() int {
 }
 
 // Keys returns a map of all keys currently in the cache.
-func (c *Cache[K, V]) Keys() map[K]struct{} {
+func (c *Cache[K, V]) Keys() []K {
 	return c.store.Keys()
 }
 
@@ -126,7 +126,7 @@ type storer[K comparable, V any] interface {
 	Get(key K, deleteExpired bool) (Item[K, V], bool)
 	Delete(keys ...K)
 	Items() (map[K]Item[K, V], unlockFunc)
-	Keys() map[K]struct{}
+	Keys() []K
 	Size() int
 	Flush()
 }

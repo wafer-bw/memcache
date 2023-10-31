@@ -187,7 +187,7 @@ func ExampleCache_Keys() {
 	cache.Set(1, "one")
 	cache.Set(2, "two")
 
-	for key := range cache.Keys() {
+	for _, key := range cache.Keys() {
 		fmt.Println(key)
 	}
 	// Unordered output:
