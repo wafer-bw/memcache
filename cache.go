@@ -11,7 +11,7 @@ import (
 // *Due to the generic nature of the cache it is possible to store types that
 // are mutatable by reference which is not thread-safe. Instead of applying a
 // stricter type constraint on K & V to prevent this, it is left up to the user
-// to decide the nature of their cache.
+// to dictate the nature of their cache.
 type Cache[K comparable, V any] struct {
 	store  storer[K, V]
 	closer *closer.Closer
