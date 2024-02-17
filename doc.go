@@ -2,7 +2,6 @@
 package memcache
 
 // TODO:
-// - Remove closer and use regular way to do it so it's easier to read and
-//   understand the code.
 // - Separate concerns of cache wrapper and active & passive expiration.
+// - Verify correctness of each store so far.
 // - Add more eviction policies.
