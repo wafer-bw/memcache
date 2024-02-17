@@ -2,6 +2,7 @@
 package memcache
 
 // TODO:
-// - Separate concerns of store vs top level cache. Is the cache just a wrapper
-//   or does it have its own behavior to add?
+// - Remove closer and use regular way to do it so it's easier to read and
+//   understand the code.
+// - Separate concerns of cache wrapper and active & passive expiration.
 // - Add more eviction policies.

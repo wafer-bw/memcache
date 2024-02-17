@@ -1,35 +1,38 @@
-package memcache
+package lru
 
 import (
 	"container/list"
 	"sync"
+
+	"github.com/wafer-bw/memcache/errs"
+	"github.com/wafer-bw/memcache/internal/data"
 )
 
-type lruStore[K comparable, V any] struct {
+type Store[K comparable, V any] struct {
 	mu sync.RWMutex
 
 	capacity int
 	list     *list.List
 	elements map[K]*list.Element
-	items    map[K]Item[K, V]
+	items    map[K]data.Item[K, V]
 }
 
-func newLRUStore[K comparable, V any](capacity int) (*lruStore[K, V], error) {
+func Open[K comparable, V any](capacity int) (*Store[K, V], error) {
 	if capacity <= 1 {
-		return nil, ErrInvalidCapacity
+		return nil, errs.ErrInvalidCapacity
 	}
 
-	store := &lruStore[K, V]{
+	store := &Store[K, V]{
 		capacity: capacity,
 		list:     list.New(),
 		elements: make(map[K]*list.Element, capacity),
-		items:    make(map[K]Item[K, V], capacity),
+		items:    make(map[K]data.Item[K, V], capacity),
 	}
 
 	return store, nil
 }
 
-func (s *lruStore[K, V]) Set(key K, value Item[K, V]) {
+func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -47,21 +50,22 @@ func (s *lruStore[K, V]) Set(key K, value Item[K, V]) {
 	}
 }
 
-func (s *lruStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
+func (s *Store[K, V]) Get(key K, deleteExpired bool) (data.Item[K, V], bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	item, ok := s.items[key]
 	if !ok {
-		return Item[K, V]{}, false
+		return data.Item[K, V]{}, false
 	}
 
-	if item.IsExpired() && deleteExpired {
-		s.list.Remove(s.elements[key])
-		delete(s.elements, key)
-		delete(s.items, key)
-
-		return Item[K, V]{}, false
+	if item.IsExpired() {
+		if deleteExpired {
+			s.list.Remove(s.elements[key])
+			delete(s.elements, key)
+			delete(s.items, key)
+		}
+		return data.Item[K, V]{}, false
 	}
 
 	s.list.MoveToFront(s.elements[key])
@@ -69,12 +73,7 @@ func (s *lruStore[K, V]) Get(key K, deleteExpired bool) (Item[K, V], bool) {
 	return item, true
 }
 
-func (s *lruStore[K, V]) Items() (map[K]Item[K, V], unlockFunc) {
-	s.mu.Lock()
-	return s.items, s.mu.Unlock
-}
-
-func (s *lruStore[K, V]) Keys() []K {
+func (s *Store[K, V]) Keys() []K {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -86,7 +85,7 @@ func (s *lruStore[K, V]) Keys() []K {
 	return keys
 }
 
-func (s *lruStore[K, V]) Delete(keys ...K) {
+func (s *Store[K, V]) Delete(keys ...K) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -102,7 +101,7 @@ func (s *lruStore[K, V]) Delete(keys ...K) {
 	}
 }
 
-func (s *lruStore[K, V]) Flush() {
+func (s *Store[K, V]) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -111,9 +110,15 @@ func (s *lruStore[K, V]) Flush() {
 	clear(s.items)
 }
 
-func (s *lruStore[K, V]) Size() int {
+func (s *Store[K, V]) Size() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return len(s.items)
+}
+
+func (s *Store[K, V]) Items() (map[K]data.Item[K, V], func()) {
+	s.mu.Lock()
+
+	return s.items, s.mu.Unlock
 }

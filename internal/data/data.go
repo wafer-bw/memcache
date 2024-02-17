@@ -1,4 +1,4 @@
-package memcache
+package data
 
 import "time"
 
@@ -14,6 +14,5 @@ func (i Item[K, V]) IsExpired() bool {
 	if i.ExpireAt == nil {
 		return false
 	}
-
 	return time.Now().After(*i.ExpireAt)
 }

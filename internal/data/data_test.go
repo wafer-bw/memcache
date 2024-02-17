@@ -1,11 +1,11 @@
-package memcache_test
+package data_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/wafer-bw/memcache"
+	"github.com/wafer-bw/memcache/internal/data"
 )
 
 func TestItem_IsExpired(t *testing.T) {
@@ -14,7 +14,7 @@ func TestItem_IsExpired(t *testing.T) {
 	t.Run("returns false when ExpireAt is nil", func(t *testing.T) {
 		t.Parallel()
 
-		var i memcache.Item[int, string]
+		var i data.Item[int, string]
 		require.False(t, i.IsExpired())
 	})
 
@@ -22,7 +22,7 @@ func TestItem_IsExpired(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now().Add(1 * time.Minute)
-		i := memcache.Item[int, string]{ExpireAt: &now}
+		i := data.Item[int, string]{ExpireAt: &now}
 		require.False(t, i.IsExpired())
 	})
 
@@ -30,7 +30,7 @@ func TestItem_IsExpired(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now().Add(-1 * time.Minute)
-		i := memcache.Item[int, string]{ExpireAt: &now}
+		i := data.Item[int, string]{ExpireAt: &now}
 		require.True(t, i.IsExpired())
 	})
 }

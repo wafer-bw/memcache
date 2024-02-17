@@ -91,21 +91,6 @@ func ExampleCache_Get() {
 	// false
 }
 
-func ExampleCache_Has() {
-	cache, err := memcache.Open[int, string]()
-	if err != nil {
-		panic(err)
-	}
-
-	cache.Set(1, "one")
-
-	fmt.Println(cache.Has(1))
-	fmt.Println(cache.Has(2))
-	// Output:
-	// true
-	// false
-}
-
 func ExampleCache_Delete() {
 	cache, err := memcache.Open[int, string]()
 	if err != nil {

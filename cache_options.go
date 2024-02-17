@@ -2,6 +2,9 @@ package memcache
 
 import (
 	"time"
+
+	"github.com/wafer-bw/memcache/errs"
+	"github.com/wafer-bw/memcache/internal/store/lru"
 )
 
 // Option defines the signature of a function that can be passed to [Open] as
@@ -29,7 +32,7 @@ func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		if interval <= 0 {
-			return ErrInvalidInterval
+			return errs.ErrInvalidInterval
 		}
 
 		c.activeExpirationInterval = interval
@@ -45,7 +48,7 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 // of keys it is allowed to hold.
 func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		store, err := newLRUStore[K, V](capacity)
+		store, err := lru.Open[K, V](capacity)
 		if err != nil {
 			return err
 		}
