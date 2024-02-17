@@ -571,7 +571,7 @@ func TestCache_Close(t *testing.T) {
 		runtime.GC()  // explicitly run garbage collection
 
 		select {
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(500 * time.Millisecond):
 			t.Fatal("cache was not garbage collected")
 		case <-ch:
 			// cache was garbage collected

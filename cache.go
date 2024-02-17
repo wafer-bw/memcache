@@ -3,7 +3,6 @@ package memcache
 import (
 	"time"
 
-	"github.com/wafer-bw/memcache/internal/closer"
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
@@ -21,8 +20,8 @@ type storer[K comparable, V any] interface {
 
 // Cache is a generic in-memory key-value cache.
 type Cache[K comparable, V any] struct {
-	store  storer[K, V]
-	closer *closer.Closer
+	store   storer[K, V]
+	closeCh chan struct{}
 
 	passiveExpiration        bool
 	activeExpirationInterval time.Duration
@@ -31,7 +30,7 @@ type Cache[K comparable, V any] struct {
 // Open a new in-memory key-value cache.
 func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	c := &Cache[K, V]{
-		closer: closer.New(),
+		closeCh: make(chan struct{}),
 	}
 
 	for _, option := range options {
@@ -102,18 +101,23 @@ func (c *Cache[K, V]) Flush() {
 // Close the cache, stopping all running goroutines. Should be called when the
 // cache is no longer needed.
 func (c *Cache[K, V]) Close() {
-	c.closer.Close()
+	// TODO: does this need to be protected by a mutex?
+	select {
+	case <-c.closeCh:
+		return
+	default:
+		close(c.closeCh)
+	}
 }
 
 // TODO: determine best way & place to handle this.
 func (c *Cache[K, V]) runActiveExpirer() {
-	closerCh := c.closer.WaitClosed()
 	ticker := time.NewTicker(c.activeExpirationInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-closerCh:
+		case <-c.closeCh:
 			return
 		case <-ticker.C:
 			deleteAllExpiredKeys(c.store)
