@@ -120,7 +120,7 @@ func TestCache_activeExpiration(t *testing.T) {
 
 		items, unlock := cache.Store().Items()
 		defer unlock()
-		require.Empty(t, items, time.Now())
+		require.Empty(t, items)
 	})
 }
 
