@@ -3,33 +3,48 @@ package lru
 import (
 	"container/list"
 	"sync"
+	"time"
 
-	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 )
 
-type Store[K comparable, V any] struct {
-	mu sync.RWMutex
+const (
+	PolicyName      string = "lru"
+	MinimumCapacity int    = 1
+)
 
-	capacity int
-	list     *list.List
-	elements map[K]*list.Element
-	items    map[K]data.Item[K, V]
+type Store[K comparable, V any] struct {
+	mu                sync.RWMutex
+	closeCh           chan struct{}
+	list              *list.List
+	elements          map[K]*list.Element
+	items             map[K]data.Item[K, V]
+	capacity          int
+	passiveExpiration bool
 }
 
-func Open[K comparable, V any](capacity int) (*Store[K, V], error) {
-	if capacity <= 1 {
-		return nil, errs.ErrInvalidCapacity
+type Config struct {
+	Capacity                 int
+	PassiveExpiration        bool
+	ActiveExpirationInterval time.Duration
+}
+
+func Open[K comparable, V any](config Config) (*Store[K, V], error) {
+	s := &Store[K, V]{
+		mu:                sync.RWMutex{},
+		closeCh:           make(chan struct{}),
+		capacity:          config.Capacity,
+		list:              list.New(),
+		elements:          make(map[K]*list.Element, config.Capacity),
+		items:             make(map[K]data.Item[K, V], config.Capacity),
+		passiveExpiration: config.PassiveExpiration,
 	}
 
-	store := &Store[K, V]{
-		capacity: capacity,
-		list:     list.New(),
-		elements: make(map[K]*list.Element, capacity),
-		items:    make(map[K]data.Item[K, V], capacity),
+	if config.ActiveExpirationInterval > 0 {
+		go s.runActiveExpirer(config.ActiveExpirationInterval)
 	}
 
-	return store, nil
+	return s, nil
 }
 
 func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
@@ -50,7 +65,7 @@ func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
 	}
 }
 
-func (s *Store[K, V]) Get(key K, deleteExpired bool) (data.Item[K, V], bool) {
+func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -60,7 +75,7 @@ func (s *Store[K, V]) Get(key K, deleteExpired bool) (data.Item[K, V], bool) {
 	}
 
 	if item.IsExpired() {
-		if deleteExpired {
+		if s.passiveExpiration {
 			s.list.Remove(s.elements[key])
 			delete(s.elements, key)
 			delete(s.items, key)
@@ -71,18 +86,6 @@ func (s *Store[K, V]) Get(key K, deleteExpired bool) (data.Item[K, V], bool) {
 	s.list.MoveToFront(s.elements[key])
 
 	return item, true
-}
-
-func (s *Store[K, V]) Keys() []K {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	keys := make([]K, 0, len(s.items))
-	for key := range s.items {
-		keys = append(keys, key)
-	}
-
-	return keys
 }
 
 func (s *Store[K, V]) Delete(keys ...K) {
@@ -101,6 +104,31 @@ func (s *Store[K, V]) Delete(keys ...K) {
 	}
 }
 
+func (s *Store[K, V]) Size() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return len(s.items)
+}
+
+func (s *Store[K, V]) Keys() []K {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	keys := make([]K, 0, len(s.items))
+	for key := range s.items {
+		keys = append(keys, key)
+	}
+
+	return keys
+}
+
+func (s *Store[K, V]) Items() (map[K]data.Item[K, V], func()) {
+	s.mu.Lock()
+
+	return s.items, s.mu.Unlock
+}
+
 func (s *Store[K, V]) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -110,15 +138,50 @@ func (s *Store[K, V]) Flush() {
 	clear(s.items)
 }
 
-func (s *Store[K, V]) Size() int {
+func (s *Store[K, V]) Close() {
+	// TODO: does this need to be protected by a mutex?
+	select {
+	case <-s.closeCh:
+		return
+	default:
+		close(s.closeCh)
+	}
+}
+
+func (s *Store[K, V]) Closed() bool {
+	// TODO: does this need to be protected by a mutex?
+	select {
+	case <-s.closeCh:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Store[K, V]) expiredKeys() []K {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return len(s.items)
+	keys := make([]K, 0, len(s.items))
+	for key, item := range s.items {
+		if item.IsExpired() {
+			keys = append(keys, key)
+		}
+	}
+
+	return keys
 }
 
-func (s *Store[K, V]) Items() (map[K]data.Item[K, V], func()) {
-	s.mu.Lock()
+func (s *Store[K, V]) runActiveExpirer(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-	return s.items, s.mu.Unlock
+	for {
+		select {
+		case <-s.closeCh:
+			return
+		case <-ticker.C:
+			s.Delete(s.expiredKeys()...)
+		}
+	}
 }

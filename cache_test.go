@@ -190,11 +190,11 @@ func TestNew(t *testing.T) {
 		require.IsType(t, expected, store)
 	})
 
-	t.Run("with lru eviction returns an error if the capacity is less than or equal to 1", func(t *testing.T) {
+	t.Run("with lru eviction returns an error if the capacity is less than 1", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.Open[int, int](memcache.WithLRUEviction[int, int](1))
-		require.ErrorIs(t, err, errs.ErrInvalidCapacity)
+		_, err := memcache.Open[int, int](memcache.WithLRUEviction[int, int](0))
+		require.ErrorAs(t, err, &errs.InvalidCapacityError{Capacity: 0, Minimum: 1, Policy: "lru"})
 	})
 }
 

@@ -19,14 +19,5 @@ func (c *Cache[K, V]) ExpirationInterval() time.Duration {
 }
 
 func (c *Cache[K, V]) Closed() bool {
-	select {
-	case <-c.closeCh:
-		return true
-	default:
-		return false
-	}
-}
-
-func DeleteAllExpiredKeys[K comparable, V any](store storer[K, V]) {
-	deleteAllExpiredKeys[K, V](store)
+	return c.store.Closed()
 }

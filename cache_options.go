@@ -12,7 +12,7 @@ import (
 type Option[K comparable, V any] func(*Cache[K, V]) error
 
 // WithPassiveExpiration enables the passive deletion of expired keys via
-// read methods such as [Cache.Get] & [Cache.Has].
+// read methods such as [Cache.Get].
 //
 // This can be combined with [WithActiveExpiration] to enable both passive and
 // active expiration of keys. See [Open] for example usage.
@@ -34,7 +34,6 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 		if interval <= 0 {
 			return errs.ErrInvalidInterval
 		}
-
 		c.activeExpirationInterval = interval
 		return nil
 	}
@@ -48,13 +47,32 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 // of keys it is allowed to hold.
 func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		store, err := lru.Open[K, V](capacity)
-		if err != nil {
-			return err
+		if capacity < lru.MinimumCapacity {
+			return errs.InvalidCapacityError{
+				Policy:   lru.PolicyName,
+				Capacity: capacity,
+				Minimum:  lru.MinimumCapacity,
+			}
 		}
 
-		c.store = store
+		c.policy = policyLRU
+		c.capacity = capacity
+		return nil
+	}
+}
 
+// WithCapacity is used to set the capacity of the cache if the chosen or
+// default policy does not otherwise require one.
+func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		if capacity < 0 {
+			return errs.InvalidCapacityError{
+				Policy:   "all",
+				Capacity: capacity,
+				Minimum:  0,
+			}
+		}
+		c.capacity = capacity
 		return nil
 	}
 }
