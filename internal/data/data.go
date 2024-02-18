@@ -17,3 +17,16 @@ func (i Item[K, V]) IsExpired() bool {
 	}
 	return time.Now().After(*i.ExpireAt)
 }
+
+func (i Item[K, V]) TTL() *time.Duration {
+	if i.ExpireAt == nil {
+		return nil
+	}
+
+	ttl := time.Until(*i.ExpireAt)
+	if ttl < 0 {
+		return new(time.Duration)
+	}
+
+	return &ttl
+}
