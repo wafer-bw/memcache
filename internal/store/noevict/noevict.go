@@ -1,10 +1,10 @@
 package noevict
 
 import (
+	"errors"
 	"sync"
 	"time"
 
-	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/closeable"
 	"github.com/wafer-bw/memcache/internal/data"
 )
@@ -37,11 +37,7 @@ type Config struct {
 
 func Open[K comparable, V any](config Config) (*Store[K, V], error) {
 	if config.Capacity < MinimumCapacity {
-		return nil, errs.InvalidCapacityError{
-			Policy:   PolicyName,
-			Capacity: config.Capacity,
-			Minimum:  MinimumCapacity,
-		}
+		return nil, errors.New("invalid capacity")
 	}
 
 	s := &Store[K, V]{

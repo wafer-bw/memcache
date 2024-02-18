@@ -26,8 +26,7 @@ func TestClosed(t *testing.T) {
 		t.Parallel()
 
 		c := closeable.New()
-		close := c.Closed()
-		require.False(t, close)
+		require.False(t, c.Closed())
 	})
 
 	t.Run("returns true when closed", func(t *testing.T) {
@@ -35,7 +34,6 @@ func TestClosed(t *testing.T) {
 
 		c := closeable.New()
 		c.Close()
-		closed := c.Closed()
-		require.True(t, closed)
+		require.True(t, c.Closed())
 	})
 }

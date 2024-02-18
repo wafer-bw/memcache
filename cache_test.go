@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
-	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/store/lru"
 	"github.com/wafer-bw/memcache/internal/store/noevict"
@@ -40,6 +39,17 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 	lru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		return memcache.OpenLRUCache[int, int](size, options...)
 	},
+}
+
+func TestInvalidCapacityError_Error(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns error message", func(t *testing.T) {
+		t.Parallel()
+
+		err := memcache.InvalidCapacityError{Capacity: 0, Minimum: 1, Policy: "active"}
+		require.Equal(t, "capacity 0 must be greater than 1 for active caches", err.Error())
+	})
 }
 
 func TestCache_concurrentAccess(t *testing.T) {
@@ -89,12 +99,12 @@ func TestCache_concurrentAccess(t *testing.T) {
 				var wg sync.WaitGroup
 				for i := 0; i < n2; i++ {
 					wg.Add(1)
-					go func(i int) {
+					go func() {
 						v := rand.Intn(n2 - 1)
 						defer wg.Done()
 						cache.Get(v)
 						cache.SetEx(v, 1, 1*time.Millisecond)
-					}(i)
+					}()
 				}
 				wg.Wait()
 			})
@@ -135,12 +145,13 @@ func TestCache_activeExpiration(t *testing.T) {
 func TestOpenNoEvictionCache(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns a new cache", func(t *testing.T) {
+	t.Run("returns a new no eviction cache", func(t *testing.T) {
 		t.Parallel()
 
 		c, err := memcache.OpenNoEvictionCache[int, string]()
 		require.NoError(t, err)
 		require.NotNil(t, c)
+		require.IsType(t, &noevict.Store[int, string]{}, c.Store())
 	})
 
 	t.Run("does not panic when provided nil options", func(t *testing.T) {
@@ -190,6 +201,13 @@ func TestOpenNoEvictionCache(t *testing.T) {
 		require.Equal(t, interval, c.ExpirationInterval())
 	})
 
+	t.Run("with active expiration returns an error if the interval is less than or equal to 0", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.OpenNoEvictionCache[int, int](memcache.WithActiveExpiration[int, int](0 * time.Second))
+		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
+	})
+
 	t.Run("with capacity sets capacity", func(t *testing.T) {
 		t.Parallel()
 
@@ -200,23 +218,24 @@ func TestOpenNoEvictionCache(t *testing.T) {
 		require.Equal(t, capacity, c.Capacity())
 	})
 
-	t.Run("with active expiration returns an error if the interval is less than or equal to 0", func(t *testing.T) {
+	t.Run("returns an error if capacity is less than 0", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.OpenNoEvictionCache[int, int](memcache.WithActiveExpiration[int, int](0 * time.Second))
-		require.ErrorIs(t, err, errs.ErrInvalidInterval)
+		_, err := memcache.OpenNoEvictionCache[int, int](memcache.WithCapacity[int, int](-1))
+		require.ErrorAs(t, err, &memcache.InvalidCapacityError{})
 	})
 }
 
 func TestOpenLRUCache(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns a new cache", func(t *testing.T) {
+	t.Run("returns a new lru cache", func(t *testing.T) {
 		t.Parallel()
 
 		c, err := memcache.OpenLRUCache[int, string](10)
 		require.NoError(t, err)
 		require.NotNil(t, c)
+		require.IsType(t, &lru.Store[int, string]{}, c.Store())
 	})
 
 	t.Run("does not panic when provided nil options", func(t *testing.T) {
@@ -270,22 +289,14 @@ func TestOpenLRUCache(t *testing.T) {
 		t.Parallel()
 
 		_, err := memcache.OpenLRUCache[int, int](10, memcache.WithActiveExpiration[int, int](0*time.Second))
-		require.ErrorIs(t, err, errs.ErrInvalidInterval)
-	})
-	t.Run("with lru eviction sets the store to an lru store", func(t *testing.T) {
-		t.Parallel()
-		c, _ := memcache.OpenLRUCache[int, string](2)
-		store := c.Store()
-
-		expected := &lru.Store[int, string]{}
-		require.IsType(t, expected, store)
+		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
 
-	t.Run("with lru eviction returns an error if the capacity is less than 1", func(t *testing.T) {
+	t.Run("returns an error if the capacity is less than 1", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := memcache.OpenLRUCache[int, int](0)
-		require.ErrorAs(t, err, &errs.InvalidCapacityError{})
+		require.ErrorAs(t, err, &memcache.InvalidCapacityError{})
 	})
 }
 
@@ -682,6 +693,8 @@ func TestCache_Close(t *testing.T) {
 }
 
 func TestCache_unsafe(t *testing.T) {
+	t.Parallel()
+
 	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
 		t.Parallel()
 

@@ -40,4 +40,11 @@ func TestStore_Set(t *testing.T) {
 		require.Contains(t, items, 1)
 		require.Contains(t, items, 2)
 	})
+
+	t.Run("returns an error if capacity is lower than the minimum", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := noevict.Open[int, int](noevict.Config{Capacity: noevict.MinimumCapacity - 1})
+		require.Error(t, err)
+	})
 }

@@ -1,13 +1,28 @@
 package memcache
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
-	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/store/lru"
 	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
+
+var (
+	ErrInvalidInterval = errors.New("provided interval must be greater than 0")
+)
+
+type InvalidCapacityError struct {
+	Capacity int
+	Minimum  int
+	Policy   string
+}
+
+func (e InvalidCapacityError) Error() string {
+	return fmt.Sprintf("capacity %d must be greater than %d for %s caches", e.Capacity, e.Minimum, e.Policy)
+}
 
 // storer is the interface depended upon by a Cache.
 type storer[K comparable, V any] interface {
@@ -25,6 +40,7 @@ type storer[K comparable, V any] interface {
 // Cache is a generic in-memory key-value cache.
 type Cache[K comparable, V any] struct {
 	store                    storer[K, V]
+	policy                   string
 	capacity                 int
 	passiveExpiration        bool
 	activeExpirationInterval time.Duration
@@ -39,13 +55,24 @@ type Cache[K comparable, V any] struct {
 // The capacity for this policy must be 0 (default) or set to a greater value
 // via [WithCapacity].
 func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
-	c := &Cache[K, V]{}
+	c := &Cache[K, V]{
+		policy: noevict.PolicyName,
+	}
+
 	for _, option := range options {
 		if option == nil {
 			continue
 		}
 		if err := option(c); err != nil {
 			return nil, err
+		}
+	}
+
+	if c.capacity < noevict.MinimumCapacity {
+		return nil, InvalidCapacityError{
+			Policy:   noevict.PolicyName,
+			Capacity: c.capacity,
+			Minimum:  noevict.MinimumCapacity,
 		}
 	}
 
@@ -70,13 +97,25 @@ func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K
 //
 // The capacity for this policy must be greater than 0.
 func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
-	c := &Cache[K, V]{}
+	c := &Cache[K, V]{
+		policy:   lru.PolicyName,
+		capacity: capacity,
+	}
+
 	for _, option := range options {
 		if option == nil {
 			continue
 		}
 		if err := option(c); err != nil {
 			return nil, err
+		}
+	}
+
+	if capacity < lru.MinimumCapacity {
+		return nil, InvalidCapacityError{
+			Policy:   lru.PolicyName,
+			Capacity: capacity,
+			Minimum:  lru.MinimumCapacity,
 		}
 	}
 
@@ -166,7 +205,7 @@ func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		if interval <= 0 {
-			return errs.ErrInvalidInterval
+			return ErrInvalidInterval
 		}
 		c.activeExpirationInterval = interval
 		return nil
@@ -179,7 +218,9 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 // need or use a capacity by default.
 func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		c.capacity = int(capacity)
+		// because valid values for capacity depends on the policy, we do not
+		// validate it here. Instead, it is done in each policy's open function.
+		c.capacity = capacity
 		return nil
 	}
 }

@@ -2,10 +2,10 @@ package lru
 
 import (
 	"container/list"
+	"errors"
 	"sync"
 	"time"
 
-	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/closeable"
 	"github.com/wafer-bw/memcache/internal/data"
 )
@@ -39,11 +39,7 @@ type Config struct {
 
 func Open[K comparable, V any](capacity int, config Config) (*Store[K, V], error) {
 	if capacity < MinimumCapacity {
-		return nil, errs.InvalidCapacityError{
-			Policy:   PolicyName,
-			Capacity: capacity,
-			Minimum:  MinimumCapacity,
-		}
+		return nil, errors.New("invalid capacity")
 	}
 
 	s := &Store[K, V]{
@@ -70,7 +66,7 @@ func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
 	// Adding a new key at capacity requires eviction.
 	if _, ok := s.items[key]; !ok && s.atCapacity() {
 		element := s.list.Back()
-		evictKey := element.Value.(K)
+		evictKey, _ := element.Value.(K)
 
 		s.list.Remove(element)
 		delete(s.elements, evictKey)
