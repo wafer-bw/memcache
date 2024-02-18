@@ -13,6 +13,7 @@ import (
 	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/store/lru"
+	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
 
 type cacher[K comparable, V any] interface {
@@ -32,10 +33,10 @@ var _ cacher[int, int] = (*memcache.Cache[int, int])(nil)
 const cacheSize = 100
 
 var policies = map[string]func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error){
-	"noevict": func(_ int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+	noevict.PolicyName: func(_ int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		return memcache.Open[int, int](options...)
 	},
-	"lru": func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+	lru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		options = append(options, memcache.WithLRUEviction[int, int](size))
 		return memcache.Open[int, int](options...)
 	},

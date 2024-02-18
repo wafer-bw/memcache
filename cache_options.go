@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/wafer-bw/memcache/errs"
-	"github.com/wafer-bw/memcache/internal/store/lru"
 )
 
 // Option defines the signature of a function that can be passed to [Open] as
@@ -45,16 +44,10 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 // Calculating the size of a generic map in memory incurrs a heavy performance
 // cost. For that reason, the capacity of a cache is defined as the total number
 // of keys it is allowed to hold.
+//
+// Capacity must be greater than 0.
 func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		if capacity < lru.MinimumCapacity {
-			return errs.InvalidCapacityError{
-				Policy:   lru.PolicyName,
-				Capacity: capacity,
-				Minimum:  lru.MinimumCapacity,
-			}
-		}
-
 		c.policy = policyLRU
 		c.capacity = capacity
 		return nil
@@ -62,16 +55,9 @@ func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
 }
 
 // WithCapacity is used to set the capacity of the cache if the chosen or
-// default policy does not otherwise require one.
+// default policy does not require one.
 func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
-		if capacity < 0 {
-			return errs.InvalidCapacityError{
-				Policy:   "all",
-				Capacity: capacity,
-				Minimum:  0,
-			}
-		}
 		c.capacity = capacity
 		return nil
 	}

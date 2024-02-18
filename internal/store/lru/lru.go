@@ -5,12 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 )
 
 const (
 	PolicyName      string = "lru"
-	MinimumCapacity int    = 1
+	minimumCapacity int    = 1
 )
 
 type Store[K comparable, V any] struct {
@@ -24,19 +25,26 @@ type Store[K comparable, V any] struct {
 }
 
 type Config struct {
-	Capacity                 int
 	PassiveExpiration        bool
 	ActiveExpirationInterval time.Duration
 }
 
-func Open[K comparable, V any](config Config) (*Store[K, V], error) {
+func Open[K comparable, V any](capacity int, config Config) (*Store[K, V], error) {
+	if capacity < minimumCapacity {
+		return nil, errs.InvalidCapacityError{
+			Policy:   PolicyName,
+			Capacity: capacity,
+			Minimum:  minimumCapacity,
+		}
+	}
+
 	s := &Store[K, V]{
 		mu:                sync.RWMutex{},
 		closeCh:           make(chan struct{}),
-		capacity:          config.Capacity,
+		capacity:          capacity,
 		list:              list.New(),
-		elements:          make(map[K]*list.Element, config.Capacity),
-		items:             make(map[K]data.Item[K, V], config.Capacity),
+		elements:          make(map[K]*list.Element, capacity),
+		items:             make(map[K]data.Item[K, V], capacity),
 		passiveExpiration: config.PassiveExpiration,
 	}
 
@@ -51,11 +59,8 @@ func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	element := s.list.PushFront(key)
-	s.elements[key] = element
-	s.items[key] = value
-
-	if len(s.elements) > s.capacity {
+	// Adding a new key at capacity requires eviction.
+	if _, ok := s.items[key]; !ok && s.atCapacity() {
 		element := s.list.Back()
 		evictKey := element.Value.(K)
 
@@ -63,6 +68,10 @@ func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
 		delete(s.elements, evictKey)
 		delete(s.items, evictKey)
 	}
+
+	element := s.list.PushFront(key)
+	s.elements[key] = element
+	s.items[key] = value
 }
 
 func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
@@ -184,4 +193,8 @@ func (s *Store[K, V]) runActiveExpirer(interval time.Duration) {
 			s.Delete(s.expiredKeys()...)
 		}
 	}
+}
+
+func (s *Store[K, V]) atCapacity() bool {
+	return len(s.items) >= s.capacity
 }

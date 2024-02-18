@@ -55,8 +55,7 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	var err error
 	switch c.policy {
 	case policyLRU:
-		c.store, err = lru.Open[K, V](lru.Config{
-			Capacity:                 c.capacity,
+		c.store, err = lru.Open[K, V](c.capacity, lru.Config{
 			PassiveExpiration:        c.passiveExpiration,
 			ActiveExpirationInterval: c.activeExpirationInterval,
 		})

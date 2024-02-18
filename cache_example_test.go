@@ -41,6 +41,15 @@ func ExampleOpen_withLRUEviction() {
 	defer cache.Close()
 }
 
+func ExampleOpen_withCapacity() {
+	capacity := 10
+	cache, err := memcache.Open[int, string](memcache.WithCapacity[int, string](capacity))
+	if err != nil {
+		panic(err)
+	}
+	defer cache.Close()
+}
+
 func ExampleOpen_complete() {
 	interval := 1 * time.Second
 	cache, err := memcache.Open[int, string](

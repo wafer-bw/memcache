@@ -4,10 +4,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 )
 
-const PolicyName string = "noevict"
+const (
+	PolicyName      string = "noevict"
+	minimumCapacity int    = 0
+)
 
 type Store[K comparable, V any] struct {
 	mu                sync.RWMutex
@@ -24,11 +28,19 @@ type Config struct {
 }
 
 func Open[K comparable, V any](config Config) (*Store[K, V], error) {
+	if config.Capacity < minimumCapacity {
+		return nil, errs.InvalidCapacityError{
+			Policy:   PolicyName,
+			Capacity: config.Capacity,
+			Minimum:  minimumCapacity,
+		}
+	}
+
 	s := &Store[K, V]{
 		mu:                sync.RWMutex{},
 		closeCh:           make(chan struct{}),
 		capacity:          config.Capacity,
-		items:             make(map[K]data.Item[K, V]),
+		items:             make(map[K]data.Item[K, V], config.Capacity),
 		passiveExpiration: config.PassiveExpiration,
 	}
 
@@ -42,6 +54,11 @@ func Open[K comparable, V any](config Config) (*Store[K, V], error) {
 func (s *Store[K, V]) Set(key K, value data.Item[K, V]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Do not add more keys when at capacity.
+	if _, ok := s.items[key]; !ok && s.atCapacity() {
+		return
+	}
 
 	s.items[key] = value
 }
@@ -157,4 +174,8 @@ func (s *Store[K, V]) runActiveExpirer(interval time.Duration) {
 			s.Delete(s.expiredKeys()...)
 		}
 	}
+}
+
+func (s *Store[K, V]) atCapacity() bool {
+	return s.capacity > 0 && len(s.items) >= s.capacity
 }
