@@ -10,7 +10,7 @@ import (
 
 const (
 	PolicyName      string = "noevict"
-	minimumCapacity int    = 0
+	MinimumCapacity int    = 0
 )
 
 type Store[K comparable, V any] struct {
@@ -28,11 +28,11 @@ type Config struct {
 }
 
 func Open[K comparable, V any](config Config) (*Store[K, V], error) {
-	if config.Capacity < minimumCapacity {
+	if config.Capacity < MinimumCapacity {
 		return nil, errs.InvalidCapacityError{
 			Policy:   PolicyName,
 			Capacity: config.Capacity,
-			Minimum:  minimumCapacity,
+			Minimum:  MinimumCapacity,
 		}
 	}
 

@@ -6,15 +6,12 @@ import (
 	"github.com/wafer-bw/memcache/errs"
 )
 
-// Option defines the signature of a function that can be passed to [Open] as
-// a functional option for controlling the behavior of the returned [Cache]
+// Option functions can be passed to [Open] to control optional properties of
+// the returned [Cache].
 type Option[K comparable, V any] func(*Cache[K, V]) error
 
-// WithPassiveExpiration enables the passive deletion of expired keys via
-// read methods such as [Cache.Get].
-//
-// This can be combined with [WithActiveExpiration] to enable both passive and
-// active expiration of keys. See [Open] for example usage.
+// WithPassiveExpiration enables the passive deletion of expired keys if they
+// are found to be expired when accessed by [Cache.Get].
 func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		c.passiveExpiration = true
@@ -22,12 +19,8 @@ func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
 	}
 }
 
-// WithActiveExpiration enables the active deletion of expired keys.
-//
-// This can be combined with [WithPassiveExpiration] to enable both passive and
-// active expiration of keys.
-//
-// See [Open] for example usage.
+// WithActiveExpiration enables the active deletion of expired keys at the
+// provided interval.
 func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		if interval <= 0 {
@@ -38,24 +31,10 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 	}
 }
 
-// WithLRUEviction enables the eviction of the least recently used key when the
-// cache would breach its capacity.
+// WithCapacity sets the maximum number of keys that the cache can hold.
 //
-// Calculating the size of a generic map in memory incurrs a heavy performance
-// cost. For that reason, the capacity of a cache is defined as the total number
-// of keys it is allowed to hold.
-//
-// Capacity must be greater than 0.
-func WithLRUEviction[K comparable, V any](capacity int) Option[K, V] {
-	return func(c *Cache[K, V]) error {
-		c.policy = policyLRU
-		c.capacity = capacity
-		return nil
-	}
-}
-
-// WithCapacity is used to set the capacity of the cache if the chosen or
-// default policy does not require one.
+// This option is made available to control the capacity of policies that do not
+// require a capacity.
 func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
 	return func(c *Cache[K, V]) error {
 		c.capacity = capacity

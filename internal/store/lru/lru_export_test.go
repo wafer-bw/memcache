@@ -3,9 +3,6 @@ package lru
 import "container/list"
 
 // export for testing.
-const MinimumCapacity = minimumCapacity
-
-// export for testing.
 func (s *Store[K, V]) Elements() (map[K]*list.Element, func()) {
 	s.mu.Lock()
 

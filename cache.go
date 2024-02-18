@@ -37,12 +37,16 @@ type Cache[K comparable, V any] struct {
 	activeExpirationInterval time.Duration
 }
 
-// Open a new in-memory key-value cache.
-func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
-	c := &Cache[K, V]{
-		policy: policyNoEvict,
-	}
-
+// OpenNoEvictionCache opens a new in-memory key-value cache using no eviction
+// policy.
+//
+// This policy will ignore any additional keys that would cause the cache to
+// breach its capacity.
+//
+// The capacity for this policy must be 0 (default) or greater via
+// [WithCapacity].
+func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
+	c := &Cache[K, V]{policy: policyNoEvict}
 	for _, option := range options {
 		if option == nil {
 			continue
@@ -53,19 +57,41 @@ func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	}
 
 	var err error
-	switch c.policy {
-	case policyLRU:
-		c.store, err = lru.Open[K, V](c.capacity, lru.Config{
-			PassiveExpiration:        c.passiveExpiration,
-			ActiveExpirationInterval: c.activeExpirationInterval,
-		})
-	case policyNoEvict:
-		c.store, err = noevict.Open[K, V](noevict.Config{
-			Capacity:                 c.capacity,
-			PassiveExpiration:        c.passiveExpiration,
-			ActiveExpirationInterval: c.activeExpirationInterval,
-		})
+	c.store, err = noevict.Open[K, V](noevict.Config{
+		Capacity:                 c.capacity,
+		PassiveExpiration:        c.passiveExpiration,
+		ActiveExpirationInterval: c.activeExpirationInterval,
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	return c, nil
+}
+
+// OpenLRUCache opens a new in-memory key-value cache using a least recently
+// used eviction policy.
+//
+// This policy evicts the least recently used key when the cache would breach
+// its capacity.
+//
+// The capacity for this policy must be greater than 0.
+func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
+	c := &Cache[K, V]{policy: policyLRU}
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(c); err != nil {
+			return nil, err
+		}
+	}
+
+	var err error
+	c.store, err = lru.Open[K, V](capacity, lru.Config{
+		PassiveExpiration:        c.passiveExpiration,
+		ActiveExpirationInterval: c.activeExpirationInterval,
+	})
 	if err != nil {
 		return nil, err
 	}
