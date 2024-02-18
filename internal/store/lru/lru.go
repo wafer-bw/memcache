@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/wafer-bw/memcache/errs"
+	"github.com/wafer-bw/memcache/internal/closeable"
 	"github.com/wafer-bw/memcache/internal/data"
-	"github.com/wafer-bw/memcache/internal/store/closeable"
 )
 
 const (

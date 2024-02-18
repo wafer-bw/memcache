@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/wafer-bw/memcache/internal/store/closeable"
+	"github.com/wafer-bw/memcache/internal/closeable"
 )
 
 func TestClose(t *testing.T) {
