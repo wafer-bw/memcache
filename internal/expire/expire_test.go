@@ -15,27 +15,23 @@ type expirer[K comparable, V any] interface {
 
 var _ expirer[int, int] = (*expire.AllKeys[int, int])(nil)
 
-type store struct {
-	items map[int]data.Item[int, int]
+type store[K comparable, V any] struct {
+	items map[K]data.Item[K, V]
 }
 
-func (s *store) TTL(key int) (*time.Duration, bool) {
+func (s *store[K, V]) Get(key K) (data.Item[K, V], bool) {
 	item, ok := s.items[key]
-	if !ok {
-		return nil, false
-	}
-
-	return item.TTL(), true
+	return item, ok
 }
 
-func (s *store) Delete(keys ...int) {
+func (s *store[K, V]) Delete(keys ...K) {
 	for _, key := range keys {
 		delete(s.items, key)
 	}
 }
 
-func (s *store) Keys() []int {
-	keys := make([]int, 0, len(s.items))
+func (s *store[K, V]) Keys() []K {
+	keys := make([]K, 0, len(s.items))
 	for key := range s.items {
 		keys = append(keys, key)
 	}
@@ -52,7 +48,7 @@ func TestAllKeys_Expire(t *testing.T) {
 		expired := time.Now().Add(-1 * time.Minute)
 		unexpired := time.Now().Add(1 * time.Minute)
 
-		s := &store{
+		s := &store[int, int]{
 			items: map[int]data.Item[int, int]{
 				1: {ExpireAt: nil},
 				2: {ExpireAt: &expired},

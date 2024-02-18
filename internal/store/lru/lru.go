@@ -108,18 +108,6 @@ func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
 	return item, true
 }
 
-func (s *Store[K, V]) TTL(key K) (*time.Duration, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	item, ok := s.items[key]
-	if !ok {
-		return nil, false
-	}
-
-	return item.TTL(), true
-}
-
 func (s *Store[K, V]) Delete(keys ...K) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
