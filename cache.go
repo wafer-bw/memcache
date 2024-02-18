@@ -3,12 +3,13 @@ package memcache
 import (
 	"time"
 
+	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/store/lru"
 	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
 
-// storer is the interface depended upon by a cache.
+// storer is the interface depended upon by a Cache.
 type storer[K comparable, V any] interface {
 	Set(key K, value data.Item[K, V])
 	Get(key K) (data.Item[K, V], bool)
@@ -21,18 +22,10 @@ type storer[K comparable, V any] interface {
 	Closed() bool
 }
 
-type policy string
-
-const (
-	policyNoEvict policy = policy(noevict.PolicyName)
-	policyLRU     policy = policy(lru.PolicyName)
-)
-
 // Cache is a generic in-memory key-value cache.
 type Cache[K comparable, V any] struct {
 	store                    storer[K, V]
 	capacity                 int
-	policy                   policy
 	passiveExpiration        bool
 	activeExpirationInterval time.Duration
 }
@@ -46,7 +39,7 @@ type Cache[K comparable, V any] struct {
 // The capacity for this policy must be 0 (default) or greater via
 // [WithCapacity].
 func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
-	c := &Cache[K, V]{policy: policyNoEvict}
+	c := &Cache[K, V]{}
 	for _, option := range options {
 		if option == nil {
 			continue
@@ -77,7 +70,7 @@ func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K
 //
 // The capacity for this policy must be greater than 0.
 func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
-	c := &Cache[K, V]{policy: policyLRU}
+	c := &Cache[K, V]{}
 	for _, option := range options {
 		if option == nil {
 			continue
@@ -148,4 +141,40 @@ func (c *Cache[K, V]) Flush() {
 // cache is no longer needed.
 func (c *Cache[K, V]) Close() {
 	c.store.Close()
+}
+
+// Option functions can be passed to [Open] to control optional properties of
+// the returned [Cache].
+type Option[K comparable, V any] func(*Cache[K, V]) error
+
+// WithPassiveExpiration enables the passive deletion of expired keys if they
+// are found to be expired when accessed by [Cache.Get].
+func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		c.passiveExpiration = true
+		return nil
+	}
+}
+
+// WithActiveExpiration enables the active deletion of expired keys at the
+// provided interval.
+func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		if interval <= 0 {
+			return errs.ErrInvalidInterval
+		}
+		c.activeExpirationInterval = interval
+		return nil
+	}
+}
+
+// WithCapacity sets the maximum number of keys that the cache can hold.
+//
+// This option is made available to control the capacity of policies that do not
+// require a capacity.
+func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		c.capacity = int(capacity)
+		return nil
+	}
 }

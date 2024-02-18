@@ -6,4 +6,3 @@ package memcache
 // TODO:
 // - Rename package to "inmem" or something like that to avoid stutters.
 // - Use interface for active expiration?
-// - Add more eviction policies.

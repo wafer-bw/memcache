@@ -27,8 +27,9 @@ type cacher[K comparable, V any] interface {
 	Close()
 }
 
-// Ensure memcache.Cache satisfies the cacher interface.
 var _ cacher[int, int] = (*memcache.Cache[int, int])(nil)
+var _ memcache.Storer[int, int] = (*lru.Store[int, int])(nil)
+var _ memcache.Storer[int, int] = (*noevict.Store[int, int])(nil)
 
 const cacheSize = 100
 
