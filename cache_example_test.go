@@ -81,7 +81,7 @@ func ExampleCache_Delete() {
 	cache.Set(3, "three")
 
 	cache.Delete(1)
-	cache.Delete(1, 2)
+	cache.Delete(2, 3)
 
 	_, ok := cache.Get(1)
 	fmt.Println(ok)
