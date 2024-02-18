@@ -1,7 +1,9 @@
 // Package memcache provides a generic in-memory key-value cache.
+//
+// The capacity of a cache is the total number of keys it is allowed to hold.
 package memcache
 
 // TODO:
-// - Separate concerns of store vs top level cache. Is the cache just a wrapper
-//   or does it have its own behavior to add?
-// - Add more eviction policies.
+// - Consider renaming package to "inmem" or something like that to avoid
+//   stutters.
+// - Use interface for active expiration like used with closer?

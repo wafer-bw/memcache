@@ -98,6 +98,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
+          args: --timeout=1m
 
   test:
     name: test
@@ -118,7 +119,7 @@ jobs:
           check-latest: true
           cache: true
       - name: run tests
-        run: go test -shuffle=on -v -count=1 -race -failfast -timeout=30s -covermode=atomic -coverprofile=coverage.out ./...
+        run: ./scripts/test-ci
       - name: Coverage
         uses: codecov/codecov-action@v3
 

@@ -7,46 +7,26 @@ import (
 	"github.com/wafer-bw/memcache"
 )
 
-func ExampleOpen() {
-	cache, err := memcache.Open[int, string]()
-	if err != nil {
-		panic(err)
-	}
-	_ = cache
-}
-
-func ExampleOpen_withPassiveExpiration() {
-	cache, err := memcache.Open[int, string](memcache.WithPassiveExpiration[int, string]())
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpen_withActiveExpiration() {
-	interval := 1 * time.Second
-	cache, err := memcache.Open[int, string](memcache.WithActiveExpiration[int, string](interval))
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpen_withLRUEviction() {
+func ExampleOpenNoEvictionCache() {
 	capacity := 10
-	cache, err := memcache.Open[int, string](memcache.WithLRUEviction[int, string](capacity))
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpen_complete() {
 	interval := 1 * time.Second
-	cache, err := memcache.Open[int, string](
+	cache, err := memcache.OpenNoEvictionCache[int, string](
 		memcache.WithActiveExpiration[int, string](interval),
 		memcache.WithPassiveExpiration[int, string](),
-		memcache.WithLRUEviction[int, string](10),
+		memcache.WithCapacity[int, string](capacity),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer cache.Close()
+}
+
+func ExampleOpenLRUCache() {
+	capacity := 10
+	interval := 1 * time.Second
+	cache, err := memcache.OpenLRUCache[int, string](capacity,
+		memcache.WithActiveExpiration[int, string](interval),
+		memcache.WithPassiveExpiration[int, string](),
 	)
 	if err != nil {
 		panic(err)
@@ -55,7 +35,7 @@ func ExampleOpen_complete() {
 }
 
 func ExampleCache_Set() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -64,7 +44,7 @@ func ExampleCache_Set() {
 }
 
 func ExampleCache_SetEx() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -73,7 +53,7 @@ func ExampleCache_SetEx() {
 }
 
 func ExampleCache_Get() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -91,59 +71,32 @@ func ExampleCache_Get() {
 	// false
 }
 
-func ExampleCache_Has() {
-	cache, err := memcache.Open[int, string]()
-	if err != nil {
-		panic(err)
-	}
-
-	cache.Set(1, "one")
-
-	fmt.Println(cache.Has(1))
-	fmt.Println(cache.Has(2))
-	// Output:
-	// true
-	// false
-}
-
 func ExampleCache_Delete() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}
-
-	cache.Set(1, "one")
-
-	cache.Delete(1)
-
-	_, ok := cache.Get(1)
-	fmt.Println(ok)
-	// Output:
-	// false
-}
-
-func ExampleCache_Delete_multipleKeys() {
-	cache, err := memcache.Open[int, string]()
-	if err != nil {
-		panic(err)
-	}
-
 	cache.Set(1, "one")
 	cache.Set(2, "two")
+	cache.Set(3, "three")
 
-	cache.Delete(1, 2)
+	cache.Delete(1)
+	cache.Delete(2, 3)
 
 	_, ok := cache.Get(1)
 	fmt.Println(ok)
-	_, ok = cache.Get(1)
+	_, ok = cache.Get(2)
+	fmt.Println(ok)
+	_, ok = cache.Get(3)
 	fmt.Println(ok)
 	// Output:
+	// false
 	// false
 	// false
 }
 
 func ExampleCache_Flush() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -164,7 +117,7 @@ func ExampleCache_Flush() {
 }
 
 func ExampleCache_Size() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}
@@ -178,7 +131,7 @@ func ExampleCache_Size() {
 }
 
 func ExampleCache_Keys() {
-	cache, err := memcache.Open[int, string]()
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {
 		panic(err)
 	}

@@ -3,56 +3,108 @@ package memcache
 import (
 	"time"
 
-	"github.com/wafer-bw/memcache/internal/closer"
+	"github.com/wafer-bw/memcache/errs"
+	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/store/lru"
+	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
 
-// Cache is a generic in-memory key-value thread-safe* cache.
-//
-// *Due to the generic nature of the cache it is possible to store types that
-// are mutatable by reference which is not thread-safe. Instead of applying a
-// stricter type constraint on K & V to prevent this, it is left up to the user
-// to dictate the nature of their cache.
-type Cache[K comparable, V any] struct {
-	store  storer[K, V]
-	closer *closer.Closer
+// storer is the interface depended upon by a Cache.
+type storer[K comparable, V any] interface {
+	Set(key K, value data.Item[K, V])
+	Get(key K) (data.Item[K, V], bool)
+	Delete(keys ...K)
+	Size() int
+	Keys() []K
+	Items() (map[K]data.Item[K, V], func())
+	Flush()
+	Close()
+	Closed() bool
+}
 
+// Cache is a generic in-memory key-value cache.
+type Cache[K comparable, V any] struct {
+	store                    storer[K, V]
+	capacity                 int
 	passiveExpiration        bool
 	activeExpirationInterval time.Duration
 }
 
-// Open a new in-memory key-value cache.
-func Open[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
-	cache := &Cache[K, V]{
-		store:  newNoEvictStore[K, V](),
-		closer: closer.New(),
-	}
-
+// OpenNoEvictionCache opens a new in-memory key-value cache using no eviction
+// policy.
+//
+// This policy will ignore any additional keys that would cause the cache to
+// breach its capacity.
+//
+// The capacity for this policy must be 0 (default) or greater via
+// [WithCapacity].
+func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
+	c := &Cache[K, V]{}
 	for _, option := range options {
 		if option == nil {
 			continue
 		}
-		if err := option(cache); err != nil {
+		if err := option(c); err != nil {
 			return nil, err
 		}
 	}
 
-	if cache.activeExpirationInterval > 0 {
-		go cache.runActiveExpirer()
+	var err error
+	c.store, err = noevict.Open[K, V](noevict.Config{
+		Capacity:                 c.capacity,
+		PassiveExpiration:        c.passiveExpiration,
+		ActiveExpirationInterval: c.activeExpirationInterval,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return cache, nil
+	return c, nil
+}
+
+// OpenLRUCache opens a new in-memory key-value cache using a least recently
+// used eviction policy.
+//
+// This policy evicts the least recently used key when the cache would breach
+// its capacity.
+//
+// The capacity for this policy must be greater than 0.
+func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
+	c := &Cache[K, V]{}
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(c); err != nil {
+			return nil, err
+		}
+	}
+
+	var err error
+	c.store, err = lru.Open[K, V](capacity, lru.Config{
+		PassiveExpiration:        c.passiveExpiration,
+		ActiveExpirationInterval: c.activeExpirationInterval,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // Set permanent key to hold value in the cache.
 func (c *Cache[K, V]) Set(key K, value V) {
-	c.store.Set(key, Item[K, V]{Value: value})
+	c.store.Set(key, data.Item[K, V]{Value: value})
 }
 
 // SetEx key to hold value in the cache and set key to timeout after the
 // provided ttl.
 func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 	expireAt := time.Now().Add(ttl)
-	c.store.Set(key, Item[K, V]{Value: value, ExpireAt: &expireAt})
+	c.store.Set(key, data.Item[K, V]{
+		Value:    value,
+		ExpireAt: &expireAt,
+	})
 }
 
 // Get returns the value associated with the provided key if it exists, or false
@@ -61,32 +113,13 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 // If the cache was opened with [WithPassiveExpiration] and the requested key
 // is expired, it will be deleted from the cache and false will be returned.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
-	item, ok := c.store.Get(key, c.passiveExpiration)
-	if !ok || item.IsExpired() {
-		var v V
-		return v, false
-	}
-
+	item, ok := c.store.Get(key)
 	return item.Value, ok
-}
-
-// Has returns true if the provided key exists in the cache.
-//
-// If the cache was opened with [WithPassiveExpiration] and the requested key
-// is expired, it will be deleted from the cache and false will be returned.
-func (c *Cache[K, V]) Has(key K) bool {
-	_, ok := c.Get(key)
-	return ok
 }
 
 // Delete provided keys from the cache.
 func (c *Cache[K, V]) Delete(keys ...K) {
 	c.store.Delete(keys...)
-}
-
-// Flush the cache, deleting all keys.
-func (c *Cache[K, V]) Flush() {
-	c.store.Flush()
 }
 
 // Size returns the number of items currently in the cache.
@@ -99,49 +132,49 @@ func (c *Cache[K, V]) Keys() []K {
 	return c.store.Keys()
 }
 
+// Flush the cache, deleting all keys.
+func (c *Cache[K, V]) Flush() {
+	c.store.Flush()
+}
+
 // Close the cache, stopping all running goroutines. Should be called when the
 // cache is no longer needed.
 func (c *Cache[K, V]) Close() {
-	c.closer.Close()
+	c.store.Close()
 }
 
-func (c *Cache[K, V]) runActiveExpirer() {
-	closerCh := c.closer.WaitClosed()
-	ticker := time.NewTicker(c.activeExpirationInterval)
-	defer ticker.Stop()
+// Option functions can be passed to [Open] to control optional properties of
+// the returned [Cache].
+type Option[K comparable, V any] func(*Cache[K, V]) error
 
-	for {
-		select {
-		case <-closerCh:
-			return
-		case <-ticker.C:
-			deleteAllExpiredKeys(c.store)
-		}
+// WithPassiveExpiration enables the passive deletion of expired keys if they
+// are found to be expired when accessed by [Cache.Get].
+func WithPassiveExpiration[K comparable, V any]() Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		c.passiveExpiration = true
+		return nil
 	}
 }
 
-// deleteAllExpiredKeys from the provided store.
-func deleteAllExpiredKeys[K comparable, V any](store storer[K, V]) {
-	keys := store.Keys()
-	expireKeys := make([]K, 0, len(keys))
-	for _, key := range keys {
-		if item, ok := store.Get(key, false); ok && item.IsExpired() {
-			expireKeys = append(expireKeys, key)
+// WithActiveExpiration enables the active deletion of expired keys at the
+// provided interval.
+func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		if interval <= 0 {
+			return errs.ErrInvalidInterval
 		}
+		c.activeExpirationInterval = interval
+		return nil
 	}
-	store.Delete(expireKeys...)
 }
 
-// storer is the interface depended upon by a cache.
-type storer[K comparable, V any] interface {
-	Set(key K, value Item[K, V])
-	Get(key K, deleteExpired bool) (Item[K, V], bool)
-	Delete(keys ...K)
-	Items() (map[K]Item[K, V], unlockFunc)
-	Keys() []K
-	Size() int
-	Flush()
+// WithCapacity sets the maximum number of keys that the cache can hold.
+//
+// This option is made available to control the capacity of policies that do not
+// require a capacity.
+func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
+	return func(c *Cache[K, V]) error {
+		c.capacity = int(capacity)
+		return nil
+	}
 }
-
-// unlockFunc unlocks the mutex for the cache store.
-type unlockFunc func()
