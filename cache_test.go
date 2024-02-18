@@ -24,6 +24,15 @@ type cacher[K comparable, V any] interface {
 	Keys() []K
 	Flush()
 	Close()
+
+	// TODO - add the following methods:
+	// Need:
+	// - Scan()   // iterate over keys in cache (requires upcoming go iterators).
+	// - Random() // return random key from cache.
+	// - TTL()   // return time to live for key.
+	// Maybe:
+	// - Persist() // remove ttl from key
+	// - Expire()  // set ttl for key
 }
 
 var _ cacher[int, int] = (*memcache.Cache[int, int])(nil)
