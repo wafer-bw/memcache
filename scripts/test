@@ -1,4 +1,6 @@
 #!/bin/sh
 
-go test -shuffle=on -v -count=1 -race -failfast -timeout=30s -covermode=atomic -coverprofile=coverage.out ./...
+set -e
+
+go test -shuffle=on -count=1 -race -failfast -timeout=30s -covermode=atomic -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out | grep "total:" | grep "(statements)"

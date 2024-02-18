@@ -19,6 +19,7 @@ type cacher[K comparable, V any] interface {
 	Set(key K, value V)
 	SetEx(key K, value V, ttl time.Duration)
 	Get(key K) (V, bool)
+	TTL(key K) (*time.Duration, bool)
 	Delete(keys ...K)
 	Size() int
 	Keys() []K
@@ -27,12 +28,11 @@ type cacher[K comparable, V any] interface {
 
 	// TODO - add the following methods:
 	// Need:
-	// - Scan()   // iterate over keys in cache (requires upcoming go iterators).
-	// - Random() // return random key from cache.
-	// - TTL()   // return time to live for key.
+	// - Scan()    // iterate over keys in cache (requires upcoming go iterators).
 	// Maybe:
-	// - Persist() // remove ttl from key
-	// - Expire()  // set ttl for key
+	// - Random()  // return random key/value from cache.
+	// - Persist() // remove ttl from key.
+	// - Expire()  // set ttl for key.
 }
 
 var _ cacher[int, int] = (*memcache.Cache[int, int])(nil)
@@ -457,6 +457,91 @@ func TestCache_Get(t *testing.T) {
 				items, unlock := store.Items()
 				defer unlock()
 				require.Contains(t, items, 1)
+			})
+		}
+	})
+}
+
+func TestCache_TTL(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns remaining ttl of expiring item", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+
+				setTTL := 1 * time.Minute
+				expireAt := time.Now().Add(setTTL)
+				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				ttl, ok := c.TTL(1)
+				require.True(t, ok)
+				require.Greater(t, *ttl, setTTL-1*time.Second)
+			})
+		}
+	})
+
+	t.Run("returns zero ttl for expired item", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+
+				setTTL := -1 * time.Minute
+				expireAt := time.Now().Add(setTTL)
+				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				ttl, ok := c.TTL(1)
+				require.True(t, ok)
+				require.Equal(t, time.Duration(0), *ttl)
+			})
+		}
+	})
+
+	t.Run("returns nil ttl for non-expiring item", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+				store := c.Store()
+
+				store.Set(1, data.Item[int, int]{Value: 1})
+
+				ttl, ok := c.TTL(1)
+				require.True(t, ok)
+				require.Nil(t, ttl)
+			})
+		}
+	})
+
+	t.Run("returns nil ttl and false if key does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				ttl, ok := c.TTL(1)
+				require.False(t, ok)
+				require.Nil(t, ttl)
 			})
 		}
 	})

@@ -71,6 +71,22 @@ func ExampleCache_Get() {
 	// false
 }
 
+func ExampleCache_TTL() {
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
+	if err != nil {
+		panic(err)
+	}
+
+	cache.SetEx(1, "one", 2*time.Minute)
+
+	v, ok := cache.TTL(1)
+	fmt.Println(v.Truncate(time.Minute))
+	fmt.Println(ok)
+	// Output:
+	// 1m0s
+	// true
+}
+
 func ExampleCache_Delete() {
 	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {

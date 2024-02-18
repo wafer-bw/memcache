@@ -28,6 +28,7 @@ func (e InvalidCapacityError) Error() string {
 type storer[K comparable, V any] interface {
 	Set(key K, value data.Item[K, V])
 	Get(key K) (data.Item[K, V], bool)
+	TTL(key K) (*time.Duration, bool)
 	Delete(keys ...K)
 	Size() int
 	Keys() []K
@@ -153,6 +154,12 @@ func (c *Cache[K, V]) SetEx(key K, value V, ttl time.Duration) {
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	item, ok := c.store.Get(key)
 	return item.Value, ok
+}
+
+// TTL for the provided key if it exists, or false if it does not. If the key is
+// will not expire then (nil, true) will be returned.
+func (c *Cache[K, V]) TTL(key K) (*time.Duration, bool) {
+	return c.store.TTL(key)
 }
 
 // Delete provided keys from the cache.

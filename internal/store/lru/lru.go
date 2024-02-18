@@ -8,6 +8,7 @@ import (
 
 	"github.com/wafer-bw/memcache/internal/closeable"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/expire"
 )
 
 const (
@@ -15,15 +16,18 @@ const (
 	MinimumCapacity int    = 1
 )
 
-// closer is the interface depended on by [Store] to ensure its goroutines are
-// always closed.
 type closer interface {
 	Close()
 	Closed() bool
 }
 
+type expirer[K comparable, V any] interface {
+	Expire(expire.Storer[K, V])
+}
+
 type Store[K comparable, V any] struct {
 	closer
+	expirer           expirer[K, V]
 	mu                sync.RWMutex
 	list              *list.List
 	elements          map[K]*list.Element
@@ -44,6 +48,7 @@ func Open[K comparable, V any](capacity int, config Config) (*Store[K, V], error
 
 	s := &Store[K, V]{
 		closer:            closeable.New(),
+		expirer:           expire.AllKeys[K, V]{},
 		mu:                sync.RWMutex{},
 		capacity:          capacity,
 		list:              list.New(),
@@ -101,6 +106,18 @@ func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
 	return item, true
 }
 
+func (s *Store[K, V]) TTL(key K) (*time.Duration, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	item, ok := s.items[key]
+	if !ok {
+		return nil, false
+	}
+
+	return item.TTL(), true
+}
+
 func (s *Store[K, V]) Delete(keys ...K) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -151,20 +168,6 @@ func (s *Store[K, V]) Flush() {
 	clear(s.items)
 }
 
-func (s *Store[K, V]) expiredKeys() []K {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	keys := make([]K, 0, len(s.items))
-	for key, item := range s.items {
-		if item.IsExpired() {
-			keys = append(keys, key)
-		}
-	}
-
-	return keys
-}
-
 func (s *Store[K, V]) runActiveExpirer(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -174,7 +177,7 @@ func (s *Store[K, V]) runActiveExpirer(interval time.Duration) {
 		if s.Closed() {
 			return
 		}
-		s.Delete(s.expiredKeys()...)
+		s.expirer.Expire(s)
 	}
 }
 

@@ -2,7 +2,9 @@ package memcache_test
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 )
 
 var sizes = []int{100, 1000, 10000, 100000}
@@ -47,22 +49,23 @@ func BenchmarkCache_Get(b *testing.B) {
 	}
 }
 
-func BenchmarkCache_Get_parallel(b *testing.B) {
+func BenchmarkCache_TTL(b *testing.B) {
 	for policy, newCache := range policies {
-		cache, err := newCache(2)
-		if err != nil {
-			b.Fatal(err)
-		}
+		for _, size := range sizes {
+			cache, err := newCache(size)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for i := 0; i < size; i++ {
+				cache.SetEx(i, i, time.Duration(rand.Intn(100))*time.Millisecond)
+			}
 
-		cache.Set(1, 1)
-
-		b.Run(fmt.Sprintf("%s policy parallel", policy), func(b *testing.B) {
-			b.RunParallel(func(pb *testing.PB) {
-				for pb.Next() {
-					_, _ = cache.Get(1)
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					_, _ = cache.TTL(i % size)
 				}
 			})
-		})
+		}
 	}
 }
 
