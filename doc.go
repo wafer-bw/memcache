@@ -4,6 +4,7 @@
 package memcache
 
 // TODO:
+// - Consider relocating errors back into package memcache.
 // - Consider renaming package to "inmem" or something like that to avoid
 //   stutters.
 // - Use interface for active expiration like used with closer?
