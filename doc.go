@@ -4,8 +4,7 @@
 package memcache
 
 // TODO:
-// - Use interface for active expiration like used with closer?
 // - Create dedicated underlying data structures for caches depending on their
-//   needs?
+//   needs? This can likely replace full storer implementations.
 // - Consider renaming package to "inmem" or something like that to avoid
 //   stutters.
