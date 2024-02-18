@@ -7,7 +7,7 @@ import (
 
 	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
-	"github.com/wafer-bw/memcache/internal/store/closer"
+	"github.com/wafer-bw/memcache/internal/store/closeable"
 )
 
 const (
@@ -15,8 +15,15 @@ const (
 	MinimumCapacity int    = 1
 )
 
+// closer is the interface depended on by [Store] to ensure its goroutines are
+// always closed.
+type closer interface {
+	Close()
+	Closed() bool
+}
+
 type Store[K comparable, V any] struct {
-	*closer.Closer
+	closer
 	mu                sync.RWMutex
 	list              *list.List
 	elements          map[K]*list.Element
@@ -40,7 +47,7 @@ func Open[K comparable, V any](capacity int, config Config) (*Store[K, V], error
 	}
 
 	s := &Store[K, V]{
-		Closer:            closer.New(),
+		closer:            closeable.New(),
 		mu:                sync.RWMutex{},
 		capacity:          capacity,
 		list:              list.New(),

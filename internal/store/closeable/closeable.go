@@ -1,20 +1,20 @@
-package closer
+package closeable
 
 import "sync"
 
-type Closer struct {
+type Close struct {
 	mu     sync.RWMutex // TODO: is this mutex necessary?
 	once   sync.Once
 	closed bool
 }
 
-func New() *Closer {
-	return &Closer{
+func New() *Close {
+	return &Close{
 		mu: sync.RWMutex{},
 	}
 }
 
-func (c *Closer) Close() {
+func (c *Close) Close() {
 	c.once.Do(func() {
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -22,7 +22,7 @@ func (c *Closer) Close() {
 	})
 }
 
-func (c *Closer) Closed() bool {
+func (c *Close) Closed() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.closed
