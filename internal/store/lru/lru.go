@@ -7,6 +7,7 @@ import (
 
 	"github.com/wafer-bw/memcache/errs"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/store/closer"
 )
 
 const (
@@ -15,8 +16,8 @@ const (
 )
 
 type Store[K comparable, V any] struct {
+	*closer.Closer
 	mu                sync.RWMutex
-	closeCh           chan struct{}
 	list              *list.List
 	elements          map[K]*list.Element
 	items             map[K]data.Item[K, V]
@@ -39,8 +40,8 @@ func Open[K comparable, V any](capacity int, config Config) (*Store[K, V], error
 	}
 
 	s := &Store[K, V]{
+		Closer:            closer.New(),
 		mu:                sync.RWMutex{},
-		closeCh:           make(chan struct{}),
 		capacity:          capacity,
 		list:              list.New(),
 		elements:          make(map[K]*list.Element, capacity),
@@ -147,26 +148,6 @@ func (s *Store[K, V]) Flush() {
 	clear(s.items)
 }
 
-func (s *Store[K, V]) Close() {
-	// TODO: does this need to be protected by a mutex?
-	select {
-	case <-s.closeCh:
-		return
-	default:
-		close(s.closeCh)
-	}
-}
-
-func (s *Store[K, V]) Closed() bool {
-	// TODO: does this need to be protected by a mutex?
-	select {
-	case <-s.closeCh:
-		return true
-	default:
-		return false
-	}
-}
-
 func (s *Store[K, V]) expiredKeys() []K {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -186,12 +167,11 @@ func (s *Store[K, V]) runActiveExpirer(interval time.Duration) {
 	defer ticker.Stop()
 
 	for {
-		select {
-		case <-s.closeCh:
+		<-ticker.C
+		if s.Closed() {
 			return
-		case <-ticker.C:
-			s.Delete(s.expiredKeys()...)
 		}
+		s.Delete(s.expiredKeys()...)
 	}
 }
 
