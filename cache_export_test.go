@@ -23,6 +23,11 @@ func (c *Cache[K, V]) ExpirationInterval() time.Duration {
 }
 
 // export for testing.
+func (c *Cache[K, V]) Capacity() int {
+	return c.capacity
+}
+
+// export for testing.
 func (c *Cache[K, V]) Closed() bool {
 	return c.store.Closed()
 }

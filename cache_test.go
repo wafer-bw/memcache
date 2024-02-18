@@ -163,6 +163,14 @@ func TestOpenNoEvictionCache(t *testing.T) {
 		require.Nil(t, c)
 	})
 
+	t.Run("returns an error when opening the store returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenNoEvictionCache[int, string](memcache.WithCapacity[int, string](-1))
+		require.Error(t, err)
+		require.Nil(t, c)
+	})
+
 	t.Run("with passive expiration enables passive expiration", func(t *testing.T) {
 		t.Parallel()
 
@@ -180,6 +188,16 @@ func TestOpenNoEvictionCache(t *testing.T) {
 		require.NoError(t, err)
 		defer c.Close()
 		require.Equal(t, interval, c.ExpirationInterval())
+	})
+
+	t.Run("with capacity sets capacity", func(t *testing.T) {
+		t.Parallel()
+
+		capacity := 10
+
+		c, err := memcache.OpenNoEvictionCache[int, string](memcache.WithCapacity[int, string](capacity))
+		require.NoError(t, err)
+		require.Equal(t, capacity, c.Capacity())
 	})
 
 	t.Run("with active expiration returns an error if the interval is less than or equal to 0", func(t *testing.T) {
@@ -218,6 +236,14 @@ func TestOpenLRUCache(t *testing.T) {
 
 		c, err := memcache.OpenLRUCache[int, string](10, func(c *memcache.Cache[int, string]) error { return errDummy })
 		require.ErrorIs(t, err, errDummy)
+		require.Nil(t, c)
+	})
+
+	t.Run("returns an error when opening the store returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenLRUCache[int, string](0)
+		require.Error(t, err)
 		require.Nil(t, c)
 	})
 
