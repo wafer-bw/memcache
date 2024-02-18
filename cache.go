@@ -111,16 +111,16 @@ func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*
 		}
 	}
 
-	if capacity < lru.MinimumCapacity {
+	if c.capacity < lru.MinimumCapacity {
 		return nil, InvalidCapacityError{
 			Policy:   lru.PolicyName,
-			Capacity: capacity,
+			Capacity: c.capacity,
 			Minimum:  lru.MinimumCapacity,
 		}
 	}
 
 	var err error
-	c.store, err = lru.Open[K, V](capacity, lru.Config{
+	c.store, err = lru.Open[K, V](c.capacity, lru.Config{
 		PassiveExpiration:        c.passiveExpiration,
 		ActiveExpirationInterval: c.activeExpirationInterval,
 	})
