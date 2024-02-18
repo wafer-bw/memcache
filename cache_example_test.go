@@ -8,40 +8,6 @@ import (
 )
 
 func ExampleOpenNoEvictionCache() {
-	cache, err := memcache.OpenNoEvictionCache[int, string]()
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpenNoEvictionCache_withPassiveExpiration() {
-	cache, err := memcache.OpenNoEvictionCache[int, string](memcache.WithPassiveExpiration[int, string]())
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpenNoEvictionCache_withActiveExpiration() {
-	interval := 1 * time.Second
-	cache, err := memcache.OpenNoEvictionCache[int, string](memcache.WithActiveExpiration[int, string](interval))
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpenNoEvictionCache_withCapacity() {
-	capacity := 10
-	cache, err := memcache.OpenNoEvictionCache[int, string](memcache.WithCapacity[int, string](capacity))
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpenNoEvictionCache_complete() {
 	capacity := 10
 	interval := 1 * time.Second
 	cache, err := memcache.OpenNoEvictionCache[int, string](
@@ -55,26 +21,7 @@ func ExampleOpenNoEvictionCache_complete() {
 	defer cache.Close()
 }
 
-func ExampleOpenLRUCache_withPassiveExpiration() {
-	capacity := 10
-	cache, err := memcache.OpenLRUCache[int, string](capacity, memcache.WithPassiveExpiration[int, string]())
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpenLRUCache_withActiveExpiration() {
-	capacity := 10
-	interval := 1 * time.Second
-	cache, err := memcache.OpenLRUCache[int, string](capacity, memcache.WithActiveExpiration[int, string](interval))
-	if err != nil {
-		panic(err)
-	}
-	defer cache.Close()
-}
-
-func ExampleOpenLRUCache_complete() {
+func ExampleOpenLRUCache() {
 	capacity := 10
 	interval := 1 * time.Second
 	cache, err := memcache.OpenLRUCache[int, string](capacity,
@@ -129,33 +76,21 @@ func ExampleCache_Delete() {
 	if err != nil {
 		panic(err)
 	}
-
-	cache.Set(1, "one")
-
-	cache.Delete(1)
-
-	_, ok := cache.Get(1)
-	fmt.Println(ok)
-	// Output:
-	// false
-}
-
-func ExampleCache_Delete_multipleKeys() {
-	cache, err := memcache.OpenNoEvictionCache[int, string]()
-	if err != nil {
-		panic(err)
-	}
-
 	cache.Set(1, "one")
 	cache.Set(2, "two")
+	cache.Set(3, "three")
 
+	cache.Delete(1)
 	cache.Delete(1, 2)
 
 	_, ok := cache.Get(1)
 	fmt.Println(ok)
-	_, ok = cache.Get(1)
+	_, ok = cache.Get(2)
+	fmt.Println(ok)
+	_, ok = cache.Get(3)
 	fmt.Println(ok)
 	// Output:
+	// false
 	// false
 	// false
 }
