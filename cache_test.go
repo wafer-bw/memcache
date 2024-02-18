@@ -528,6 +528,23 @@ func TestCache_TTL(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("returns nil ttl and false if key does not exist", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				c, _ := newCache(cacheSize)
+
+				ttl, ok := c.TTL(1)
+				require.False(t, ok)
+				require.Nil(t, ttl)
+			})
+		}
+	})
 }
 
 func TestCache_Delete(t *testing.T) {
