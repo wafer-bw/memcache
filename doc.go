@@ -4,5 +4,6 @@
 package memcache
 
 // TODO:
-// - Rename package to "inmem" or something like that to avoid stutters.
-// - Use interface for active expiration?
+// - Consider renaming package to "inmem" or something like that to avoid
+//   stutters.
+// - Use interface for active expiration like used with closer?
