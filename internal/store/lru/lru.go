@@ -29,7 +29,6 @@ type Store[K comparable, V any] struct {
 	closer
 	expirer           expirer[K, V]
 	mu                sync.RWMutex
-	keys              []K
 	list              *list.List
 	elements          map[K]*list.Element
 	items             map[K]data.Item[K, V]
@@ -52,7 +51,6 @@ func Open[K comparable, V any](capacity int, config Config) (*Store[K, V], error
 		expirer:           expire.AllKeys[K, V]{},
 		mu:                sync.RWMutex{},
 		capacity:          capacity,
-		keys:              make([]K, 0, capacity),
 		list:              list.New(),
 		elements:          make(map[K]*list.Element, capacity),
 		items:             make(map[K]data.Item[K, V], capacity),
@@ -106,6 +104,18 @@ func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
 	s.list.MoveToFront(s.elements[key])
 
 	return item, true
+}
+
+func (s *Store[K, V]) TTL(key K) (*time.Duration, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	item, ok := s.items[key]
+	if !ok {
+		return nil, false
+	}
+
+	return item.TTL(), true
 }
 
 func (s *Store[K, V]) Delete(keys ...K) {

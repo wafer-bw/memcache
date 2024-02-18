@@ -19,9 +19,9 @@ type store[K comparable, V any] struct {
 	items map[K]data.Item[K, V]
 }
 
-func (s *store[K, V]) Get(key K) (data.Item[K, V], bool) {
+func (s *store[K, V]) TTL(key K) (*time.Duration, bool) {
 	item, ok := s.items[key]
-	return item, ok
+	return item.TTL(), ok
 }
 
 func (s *store[K, V]) Delete(keys ...K) {
