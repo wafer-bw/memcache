@@ -7,32 +7,29 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/expire"
+	"github.com/wafer-bw/memcache/internal/ports"
 )
 
-type expirer[K comparable, V any] interface {
-	Expire(expire.Storer[K, V])
-}
+var _ ports.Expirer[int, int] = (*expire.AllKeys[int, int])(nil)
 
-var _ expirer[int, int] = (*expire.AllKeys[int, int])(nil)
-
-type store[K comparable, V any] struct {
+type cache[K comparable, V any] struct {
 	items map[K]data.Item[K, V]
 }
 
-func (s *store[K, V]) TTL(key K) (*time.Duration, bool) {
-	item, ok := s.items[key]
+func (c *cache[K, V]) TTL(key K) (*time.Duration, bool) {
+	item, ok := c.items[key]
 	return item.TTL(), ok
 }
 
-func (s *store[K, V]) Delete(keys ...K) {
+func (c *cache[K, V]) Delete(keys ...K) {
 	for _, key := range keys {
-		delete(s.items, key)
+		delete(c.items, key)
 	}
 }
 
-func (s *store[K, V]) Keys() []K {
-	keys := make([]K, 0, len(s.items))
-	for key := range s.items {
+func (c *cache[K, V]) Keys() []K {
+	keys := make([]K, 0, len(c.items))
+	for key := range c.items {
 		keys = append(keys, key)
 	}
 
@@ -48,7 +45,7 @@ func TestAllKeys_Expire(t *testing.T) {
 		expired := time.Now().Add(-1 * time.Minute)
 		unexpired := time.Now().Add(1 * time.Minute)
 
-		s := &store[int, int]{
+		c := &cache[int, int]{
 			items: map[int]data.Item[int, int]{
 				1: {ExpireAt: nil},
 				2: {ExpireAt: &expired},
@@ -61,7 +58,7 @@ func TestAllKeys_Expire(t *testing.T) {
 		}
 
 		e := expire.AllKeys[int, int]{}
-		e.Expire(s)
-		require.Equal(t, 4, len(s.items))
+		e.Expire(c)
+		require.Equal(t, 4, len(c.items))
 	})
 }

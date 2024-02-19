@@ -2,13 +2,12 @@ package memcache
 
 import (
 	"time"
+
+	"github.com/wafer-bw/memcache/internal/ports"
 )
 
 // export for testing.
-type Storer[K comparable, V any] storer[K, V]
-
-// export for testing.
-func (c *Cache[K, V]) Store() Storer[K, V] {
+func (c *Cache[K, V]) Store() ports.Storer[K, V] {
 	return c.store
 }
 
@@ -23,11 +22,13 @@ func (c *Cache[K, V]) ExpirationInterval() time.Duration {
 }
 
 // export for testing.
+//
+// TODO: remove.
 func (c *Cache[K, V]) Capacity() int {
 	return c.capacity
 }
 
 // export for testing.
 func (c *Cache[K, V]) Closed() bool {
-	return c.store.Closed()
+	return c.closed()
 }

@@ -1,29 +1,31 @@
 package closeable
 
-import "sync"
-
-type Close struct {
-	mu     sync.RWMutex // TODO: is this mutex necessary?
-	once   sync.Once
-	closed bool
+type Closer struct {
+	ch chan struct{}
 }
 
-func New() *Close {
-	return &Close{
-		mu: sync.RWMutex{},
+func New() *Closer {
+	return &Closer{ch: make(chan struct{})}
+}
+
+func (c *Closer) Ch() <-chan struct{} {
+	return c.ch
+}
+
+func (c *Closer) Closed() bool {
+	select {
+	case <-c.ch:
+		return true
+	default:
+		return false
 	}
 }
 
-func (c *Close) Close() {
-	c.once.Do(func() {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		c.closed = true
-	})
-}
-
-func (c *Close) Closed() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.closed
+func (c *Closer) Close() {
+	select {
+	case <-c.ch:
+		return
+	default:
+		close(c.ch)
+	}
 }

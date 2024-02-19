@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
 	"github.com/wafer-bw/memcache/internal/data"
-	"github.com/wafer-bw/memcache/internal/store/lru"
-	"github.com/wafer-bw/memcache/internal/store/noevict"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
+	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 )
 
 type cacher[K comparable, V any] interface {
@@ -36,8 +36,6 @@ type cacher[K comparable, V any] interface {
 }
 
 var _ cacher[int, int] = (*memcache.Cache[int, int])(nil)
-var _ memcache.Storer[int, int] = (*lru.Store[int, int])(nil)
-var _ memcache.Storer[int, int] = (*noevict.Store[int, int])(nil)
 
 const cacheSize = 100
 
@@ -45,7 +43,7 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 	noevict.PolicyName: func(_ int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		return memcache.OpenNoEvictionCache[int, int](options...)
 	},
-	lru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+	allkeyslru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		return memcache.OpenLRUCache[int, int](size, options...)
 	},
 }
@@ -68,6 +66,7 @@ func TestCache_concurrentAccess(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				n := 1000
 				cache, _ := newCache(n)
+				defer cache.Close()
 
 				for i := 0; i < n; i++ {
 					cache.Set(i, i)
@@ -136,6 +135,7 @@ func TestCache_activeExpiration(t *testing.T) {
 
 				cache, _ := newCache(cacheSize, memcache.WithActiveExpiration[int, int](ttl))
 				defer cache.Close()
+				store := cache.Store()
 
 				cache.SetEx(1, 1, ttl)
 				cache.SetEx(2, 2, ttl)
@@ -143,8 +143,7 @@ func TestCache_activeExpiration(t *testing.T) {
 
 				time.Sleep(5 * ttl)
 
-				items, unlock := cache.Store().Items()
-				defer unlock()
+				items := store.Items()
 				require.Empty(t, items)
 			})
 		}
@@ -244,7 +243,7 @@ func TestOpenLRUCache(t *testing.T) {
 		c, err := memcache.OpenLRUCache[int, string](10)
 		require.NoError(t, err)
 		require.NotNil(t, c)
-		require.IsType(t, &lru.Store[int, string]{}, c.Store())
+		require.IsType(t, &allkeyslru.Store[int, string]{}, c.Store())
 	})
 
 	t.Run("does not panic when provided nil options", func(t *testing.T) {
@@ -320,11 +319,13 @@ func TestCache_Set(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				c.Set(1, 1)
-				items, unlock := c.Store().Items()
-				defer unlock()
+				cache.Set(1, 1)
+
+				items := store.Items()
 				require.Contains(t, items, 1)
 				require.Equal(t, 1, items[1].Value)
 			})
@@ -343,11 +344,13 @@ func TestCache_SetEx(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				c.SetEx(1, 1, 1*time.Minute)
-				items, unlock := c.Store().Items()
-				defer unlock()
+				cache.SetEx(1, 1, 1*time.Minute)
+
+				items := store.Items()
 				require.Contains(t, items, 1)
 				require.Equal(t, 1, items[1].Value)
 				require.Greater(t, *items[1].ExpireAt, time.Now())
@@ -367,11 +370,13 @@ func TestCache_Get(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				got, ok := c.Get(1)
+				store.Add(1, data.Item[int, int]{Value: 1})
+
+				got, ok := cache.Get(1)
 				require.True(t, ok)
 				require.Equal(t, 1, got)
 			})
@@ -386,9 +391,10 @@ func TestCache_Get(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
 
-				got, ok := c.Get(1)
+				got, ok := cache.Get(1)
 				require.False(t, ok)
 				require.Equal(t, 0, got)
 			})
@@ -403,12 +409,14 @@ func TestCache_Get(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				expireAt := time.Now()
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				got, ok := c.Get(1)
+				expireAt := time.Now()
+				store.Add(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				got, ok := cache.Get(1)
 				require.False(t, ok)
 				require.Equal(t, 0, got)
 			})
@@ -423,16 +431,17 @@ func TestCache_Get(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				expireAt := time.Now()
-				c, _ := newCache(cacheSize, memcache.WithPassiveExpiration[int, int]())
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+				cache, _ := newCache(cacheSize, memcache.WithPassiveExpiration[int, int]())
+				defer cache.Close()
+				store := cache.Store()
 
-				_, ok := c.Get(1)
+				expireAt := time.Now()
+				store.Add(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				_, ok := cache.Get(1)
 				require.False(t, ok)
 
-				items, unlock := store.Items()
-				defer unlock()
+				items := store.Items()
 				require.NotContains(t, items, 1)
 			})
 		}
@@ -446,16 +455,17 @@ func TestCache_Get(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				expireAt := time.Now()
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				_, ok := c.Get(1)
+				expireAt := time.Now()
+				store.Add(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+
+				_, ok := cache.Get(1)
 				require.False(t, ok)
 
-				items, unlock := store.Items()
-				defer unlock()
+				items := store.Items()
 				require.Contains(t, items, 1)
 			})
 		}
@@ -473,14 +483,15 @@ func TestCache_TTL(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
 				setTTL := 1 * time.Minute
 				expireAt := time.Now().Add(setTTL)
-				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+				store.Add(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
 
-				ttl, ok := c.TTL(1)
+				ttl, ok := cache.TTL(1)
 				require.True(t, ok)
 				require.Greater(t, *ttl, setTTL-1*time.Second)
 			})
@@ -495,14 +506,15 @@ func TestCache_TTL(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
 				setTTL := -1 * time.Minute
 				expireAt := time.Now().Add(setTTL)
-				store.Set(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
+				store.Add(1, data.Item[int, int]{Value: 1, ExpireAt: &expireAt})
 
-				ttl, ok := c.TTL(1)
+				ttl, ok := cache.TTL(1)
 				require.True(t, ok)
 				require.Equal(t, time.Duration(0), *ttl)
 			})
@@ -517,12 +529,13 @@ func TestCache_TTL(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				store.Set(1, data.Item[int, int]{Value: 1})
+				store.Add(1, data.Item[int, int]{Value: 1})
 
-				ttl, ok := c.TTL(1)
+				ttl, ok := cache.TTL(1)
 				require.True(t, ok)
 				require.Nil(t, ttl)
 			})
@@ -537,9 +550,10 @@ func TestCache_TTL(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
 
-				ttl, ok := c.TTL(1)
+				ttl, ok := cache.TTL(1)
 				require.False(t, ok)
 				require.Nil(t, ttl)
 			})
@@ -558,13 +572,14 @@ func TestCache_Delete(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				c.Delete(1)
-				items, unlock := store.Items()
-				defer unlock()
+				store.Add(1, data.Item[int, int]{Value: 1})
+
+				cache.Delete(1)
+				items := store.Items()
 				require.NotContains(t, items, 1)
 			})
 		}
@@ -578,14 +593,15 @@ func TestCache_Delete(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1})
-				store.Set(2, data.Item[int, int]{Value: 2})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				c.Delete(1, 2)
-				items, unlock := store.Items()
-				defer unlock()
+				store.Add(1, data.Item[int, int]{Value: 1})
+				store.Add(2, data.Item[int, int]{Value: 2})
+
+				cache.Delete(1, 2)
+				items := store.Items()
 				require.NotContains(t, items, 1)
 				require.NotContains(t, items, 2)
 			})
@@ -621,15 +637,16 @@ func TestCache_Flush(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1})
-				store.Set(2, data.Item[int, int]{Value: 2})
-				store.Set(3, data.Item[int, int]{Value: 3})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				c.Flush()
-				items, unlock := store.Items()
-				defer unlock()
+				store.Add(1, data.Item[int, int]{Value: 1})
+				store.Add(2, data.Item[int, int]{Value: 2})
+				store.Add(3, data.Item[int, int]{Value: 3})
+
+				cache.Flush()
+				items := store.Items()
 				require.Empty(t, items)
 			})
 		}
@@ -647,13 +664,15 @@ func TestCache_Size(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1})
-				store.Set(2, data.Item[int, int]{Value: 2})
-				store.Set(3, data.Item[int, int]{Value: 3})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				size := c.Size()
+				store.Add(1, data.Item[int, int]{Value: 1})
+				store.Add(2, data.Item[int, int]{Value: 2})
+				store.Add(3, data.Item[int, int]{Value: 3})
+
+				size := cache.Size()
 				require.Equal(t, 3, size)
 			})
 		}
@@ -671,13 +690,15 @@ func TestCache_Keys(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				store := c.Store()
-				store.Set(1, data.Item[int, int]{Value: 1})
-				store.Set(2, data.Item[int, int]{Value: 1})
-				store.Set(3, data.Item[int, int]{Value: 1})
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
 
-				keys := c.Keys()
+				store.Add(1, data.Item[int, int]{Value: 1})
+				store.Add(2, data.Item[int, int]{Value: 1})
+				store.Add(3, data.Item[int, int]{Value: 1})
+
+				keys := cache.Keys()
 				require.Contains(t, keys, 1)
 				require.Contains(t, keys, 2)
 				require.Contains(t, keys, 3)
@@ -697,9 +718,9 @@ func TestCache_Close(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				c.Close()
-				require.True(t, c.Closed())
+				cache, _ := newCache(cacheSize)
+				cache.Close()
+				require.True(t, cache.Closed())
 			})
 		}
 	})
@@ -712,9 +733,9 @@ func TestCache_Close(t *testing.T) {
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()
 
-				c, _ := newCache(cacheSize)
-				c.Close()
-				require.NotPanics(t, func() { c.Close() })
+				cache, _ := newCache(cacheSize)
+				cache.Close()
+				require.NotPanics(t, func() { cache.Close() })
 			})
 		}
 	})
@@ -762,7 +783,7 @@ func TestCache_Close(t *testing.T) {
 				ch := make(chan struct{})
 
 				cache := func() *memcache.Cache[int, int] {
-					interval := 1 * time.Second
+					interval := 100 * time.Millisecond
 					c, _ := newCache(cacheSize, memcache.WithActiveExpiration[int, int](interval))
 					runtime.SetFinalizer(c, func(_ *memcache.Cache[int, int]) {
 						close(ch)
@@ -792,15 +813,15 @@ func TestCache_unsafe(t *testing.T) {
 	t.Run("demonstrates unsafe usage of pointer values stored in cache", func(t *testing.T) {
 		t.Parallel()
 
-		v := false
-		c, _ := memcache.OpenNoEvictionCache[int, *bool]()
+		cache, _ := memcache.OpenNoEvictionCache[int, *bool]()
+		store := cache.Store()
 
-		c.Set(1, &v)
+		v := false
+		cache.Set(1, &v)
 		v = true
 
-		items, unlock := c.Store().Items()
-		defer unlock()
+		items := store.Items()
 		require.Contains(t, items, 1)
-		require.Equal(t, true, *items[1].Value)
+		require.True(t, *items[1].Value)
 	})
 }
