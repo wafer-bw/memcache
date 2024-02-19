@@ -4,7 +4,5 @@
 package memcache
 
 // TODO:
-// - Embed dupe eviction policy store methods using common implementation.
-// - Add tests covering remaining eviction policy store methods.
 // - Consider renaming package to "inmem" to avoid stutters.
 // - Update WithActiveExpiration to use an interface and make expirers public.
