@@ -3,7 +3,7 @@ package ports
 
 import (
 	"github.com/wafer-bw/memcache/internal/data"
-	"github.com/wafer-bw/memcache/internal/expire/v2"
+	"github.com/wafer-bw/memcache/internal/expire"
 )
 
 type Storer[K comparable, V any] interface {
