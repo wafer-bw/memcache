@@ -6,6 +6,7 @@ type Item[K comparable, V any] struct {
 	Value    V
 	ExpireAt *time.Time
 	// TODO: Event methods (requires promoting package out of internal):
+	//       They can cause a deadlock if they use the cache they are part of.
 	//       - OnEvicted func(k K, v V)
 	//       - OnExpired func(k K, v V)
 	//       - OnDeleted func(k K, v V)
