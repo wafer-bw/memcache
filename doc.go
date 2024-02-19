@@ -4,7 +4,7 @@
 package memcache
 
 // TODO:
-// - Create dedicated underlying data structures for caches depending on their
-//   needs? This can likely replace full storer implementations.
-// - Consider renaming package to "inmem" or something like that to avoid
-//   stutters.
+// - Embed dupe eviction policy store methods using common implementation.
+// - Add tests covering remaining eviction policy store methods.
+// - Consider renaming package to "inmem" to avoid stutters.
+// - Update WithActiveExpiration to use an interface and make expirers public.
