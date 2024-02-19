@@ -5,8 +5,31 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/ports"
 	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
+
+var _ ports.Storer[int, int] = (*noevict.Store[int, int])(nil)
+
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns a new store with provided capacity", func(t *testing.T) {
+		t.Parallel()
+
+		capacity := 10
+		store := noevict.New[int, int](capacity)
+		require.Equal(t, capacity, store.Capacity())
+	})
+
+	t.Run("returns a new store with default capacity when provided an invalid one", func(t *testing.T) {
+		t.Parallel()
+
+		capacity := -1
+		store := noevict.New[int, int](capacity)
+		require.Equal(t, noevict.DefaultCapacity, store.Capacity())
+	})
+}
 
 func TestStore_Set(t *testing.T) {
 	t.Parallel()
@@ -15,11 +38,10 @@ func TestStore_Set(t *testing.T) {
 		t.Parallel()
 
 		key, val := 1, 10
-		store, _ := noevict.Open[int, int](noevict.Config{})
-		store.Set(key, data.Item[int, int]{Value: val})
+		store := noevict.New[int, int](0)
+		store.Add(key, data.Item[int, int]{Value: val})
 
-		items, unlock := store.Items()
-		defer unlock()
+		items := store.Items()
 		require.Len(t, items, 1)
 		require.Equal(t, val, items[key].Value)
 	})
@@ -27,24 +49,16 @@ func TestStore_Set(t *testing.T) {
 	t.Run("does not add more keys when at capacity", func(t *testing.T) {
 		t.Parallel()
 
-		store, _ := noevict.Open[int, int](noevict.Config{Capacity: 2})
-		store.Set(1, data.Item[int, int]{Value: 10})
-		store.Set(1, data.Item[int, int]{Value: 10})
-		store.Set(1, data.Item[int, int]{Value: 10})
-		store.Set(2, data.Item[int, int]{Value: 20})
-		store.Set(3, data.Item[int, int]{Value: 30})
+		store := noevict.New[int, int](2)
+		store.Add(1, data.Item[int, int]{Value: 10})
+		store.Add(1, data.Item[int, int]{Value: 10})
+		store.Add(1, data.Item[int, int]{Value: 10})
+		store.Add(2, data.Item[int, int]{Value: 20})
+		store.Add(3, data.Item[int, int]{Value: 30})
 
-		items, unlock := store.Items()
-		defer unlock()
+		items := store.Items()
 		require.Len(t, items, 2)
 		require.Contains(t, items, 1)
 		require.Contains(t, items, 2)
-	})
-
-	t.Run("returns an error if capacity is lower than the minimum", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := noevict.Open[int, int](noevict.Config{Capacity: noevict.MinimumCapacity - 1})
-		require.Error(t, err)
 	})
 }

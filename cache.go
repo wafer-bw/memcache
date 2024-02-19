@@ -9,8 +9,8 @@ import (
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/expire/v2"
 	"github.com/wafer-bw/memcache/internal/ports"
-	"github.com/wafer-bw/memcache/internal/store/v2/allkeyslru"
-	"github.com/wafer-bw/memcache/internal/store/v2/noevict"
+	"github.com/wafer-bw/memcache/internal/store/allkeyslru"
+	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
 
 var (
@@ -25,10 +25,6 @@ type InvalidCapacityError struct {
 
 func (e InvalidCapacityError) Error() string {
 	return fmt.Sprintf("capacity %d must be greater than %d for %s caches", e.Capacity, e.Minimum, e.Policy)
-}
-
-type expirer[K comparable, V any] interface {
-	Expire(expire.Cacher[K, V])
 }
 
 // Option functions can be passed to open functions like [OpenNoEvictionCache]
@@ -57,6 +53,7 @@ func WithActiveExpiration[K comparable, V any](interval time.Duration) Option[K,
 		if interval <= 0 {
 			return ErrInvalidInterval
 		}
+		c.expirer = expire.AllKeys[K, V]{}
 		c.activeExpirationInterval = interval
 		return nil
 	}
@@ -79,11 +76,10 @@ func WithCapacity[K comparable, V any](capacity int) Option[K, V] {
 type Cache[K comparable, V any] struct {
 	closer                   ports.Closer
 	store                    ports.Storer[K, V]
-	policy                   string // TODO: remove
-	capacity                 int    // TODO: remove
+	expirer                  ports.Expirer[K, V]
+	capacity                 int
 	passiveExpiration        bool
 	activeExpirationInterval time.Duration
-	expirer                  expirer[K, V]
 }
 
 // OpenNoEvictionCache opens a new in-memory key-value cache using no eviction
@@ -97,9 +93,7 @@ type Cache[K comparable, V any] struct {
 func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K, V], error) {
 	c := &Cache[K, V]{
 		closer:   closeable.New(),
-		policy:   noevict.PolicyName,
 		capacity: noevict.DefaultCapacity,
-		expirer:  &expire.AllKeys[K, V]{},
 	}
 
 	for _, option := range options {
@@ -113,7 +107,7 @@ func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K
 
 	if c.capacity < noevict.MinimumCapacity {
 		return nil, InvalidCapacityError{
-			Policy:   c.policy,
+			Policy:   noevict.PolicyName,
 			Capacity: c.capacity,
 			Minimum:  noevict.MinimumCapacity,
 		}
@@ -138,7 +132,6 @@ func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K
 func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
 	c := &Cache[K, V]{
 		closer:   closeable.New(),
-		policy:   allkeyslru.PolicyName,
 		capacity: capacity,
 		expirer:  expire.AllKeys[K, V]{},
 	}
@@ -154,7 +147,7 @@ func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*
 
 	if c.capacity < allkeyslru.MinimumCapacity {
 		return nil, InvalidCapacityError{
-			Policy:   c.policy,
+			Policy:   allkeyslru.PolicyName,
 			Capacity: c.capacity,
 			Minimum:  allkeyslru.MinimumCapacity,
 		}
@@ -247,14 +240,12 @@ func (c *Cache[K, V]) runActiveExpirer(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	fmt.Println(interval)
-
 	for {
-		<-ticker.C
-		if c.closed() {
-			defer func() { c.expirer = nil }()
+		select {
+		case <-ticker.C:
+			c.expirer.Expire(c)
+		case <-c.closer.Ch():
 			return
 		}
-		c.expirer.Expire(c)
 	}
 }

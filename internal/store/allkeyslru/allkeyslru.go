@@ -1,31 +1,35 @@
-package noevict
+package allkeyslru
 
 import (
+	"container/list"
 	"sync"
 
 	"github.com/wafer-bw/memcache/internal/data"
 )
 
 const (
-	PolicyName      string = "noevict"
-	DefaultCapacity int    = 0
-	MinimumCapacity int    = 0
+	PolicyName      string = "allkeyslru"
+	DefaultCapacity int    = 10_000
+	MinimumCapacity int    = 2
 )
 
 type Store[K comparable, V any] struct {
 	mu       sync.RWMutex
 	capacity int
 	items    map[K]data.Item[K, V]
+	elements map[K]*list.Element
+	list     *list.List
 }
 
 func New[K comparable, V any](capacity int) *Store[K, V] {
-	if capacity < 0 {
+	if capacity < MinimumCapacity {
 		capacity = DefaultCapacity
 	}
 
 	return &Store[K, V]{
-		mu:       sync.RWMutex{},
 		capacity: capacity,
+		list:     list.New(),
+		elements: make(map[K]*list.Element, capacity),
 		items:    make(map[K]data.Item[K, V], capacity),
 	}
 }
@@ -34,18 +38,26 @@ func (s *Store[K, V]) Add(key K, item data.Item[K, V]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.atCapacity() {
-		return
-	}
-
+	element := s.list.PushFront(key)
+	s.elements[key] = element
 	s.items[key] = item
+
+	if len(s.items) > s.capacity {
+		s.evict()
+	}
 }
 
 func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	item, ok := s.items[key]
+	if !ok {
+		return item, ok
+	}
+
+	s.list.MoveToFront(s.elements[key])
+
 	return item, ok
 }
 
@@ -93,13 +105,23 @@ func (s *Store[K, V]) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.list.Init()
+	clear(s.elements)
 	clear(s.items)
 }
 
-func (s *Store[K, V]) delete(key K) {
-	delete(s.items, key)
+func (s *Store[K, V]) evict() {
+	key, _ := s.list.Back().Value.(K)
+	s.delete(key)
 }
 
-func (s *Store[K, V]) atCapacity() bool {
-	return s.capacity > 0 && len(s.items) >= s.capacity
+func (s *Store[K, V]) delete(key K) {
+	element, ok := s.elements[key]
+	if !ok {
+		return
+	}
+
+	s.list.Remove(element)
+	delete(s.elements, key)
+	delete(s.items, key)
 }

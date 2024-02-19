@@ -1,4 +1,4 @@
-package lru
+package allkeyslru
 
 import "container/list"
 
@@ -14,4 +14,9 @@ func (s *Store[K, V]) List() (*list.List, func()) {
 	s.mu.Lock()
 
 	return s.list, s.mu.Unlock
+}
+
+// export for testing.
+func (s *Store[K, V]) Capacity() int {
+	return s.capacity
 }

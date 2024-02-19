@@ -11,9 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
 	"github.com/wafer-bw/memcache/internal/data"
-	lru "github.com/wafer-bw/memcache/internal/store/lru"
-	allkeyslru "github.com/wafer-bw/memcache/internal/store/v2/allkeyslru"
-	"github.com/wafer-bw/memcache/internal/store/v2/noevict"
+	"github.com/wafer-bw/memcache/internal/store/allkeyslru"
+	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
 
 type cacher[K comparable, V any] interface {
@@ -66,7 +65,7 @@ func TestCache_concurrentAccess(t *testing.T) {
 			newCache := newCache
 			t.Run(policy, func(t *testing.T) {
 				n := 1000
-				cache, _ := newCache(n + 1)
+				cache, _ := newCache(n)
 				defer cache.Close()
 
 				for i := 0; i < n; i++ {
@@ -776,19 +775,7 @@ func TestCache_Close(t *testing.T) {
 	t.Run("cache with goroutines is garbage collected after releasing & closing", func(t *testing.T) {
 		t.Parallel()
 
-		var policiess = map[string]func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error){
-			noevict.PolicyName: func(_ int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
-				return memcache.OpenNoEvictionCache[int, int](options...)
-			},
-			allkeyslru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
-				return memcache.OpenLRUCache[int, int](size, options...)
-			},
-			lru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
-				return memcache.OpenLRUCache[int, int](size, options...)
-			},
-		}
-
-		for policy, newCache := range policiess {
+		for policy, newCache := range policies {
 			newCache := newCache
 			t.Run(policy, func(t *testing.T) {
 				t.Parallel()

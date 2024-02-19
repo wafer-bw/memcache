@@ -1,7 +1,7 @@
 # redesign notes
 
 ## Removal types
-- [ ] Active Expiration: Delete keys that are expired periodically.
+- [x] Active Expiration: Delete keys that are expired periodically.
     - Information needed:
         - Item.Expire
         - Item.TTL
@@ -28,7 +28,6 @@
 
 ## Store Duplicates
 These methods are the same across stores:
-- Get
 - Items
 - Len
 
@@ -38,4 +37,4 @@ Thesse methods are the same across stores but may not be later:
 These methods could technically be the same if they were passed a function to
 call:
 - Flush
-- Delete
+- Remove
