@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
 	"github.com/wafer-bw/memcache/internal/data"
-	"github.com/wafer-bw/memcache/internal/store/allkeyslru"
-	"github.com/wafer-bw/memcache/internal/store/noevict"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
+	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 )
 
 type cacher[K comparable, V any] interface {

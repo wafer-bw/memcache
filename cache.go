@@ -7,10 +7,10 @@ import (
 
 	"github.com/wafer-bw/memcache/internal/closeable"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
+	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 	"github.com/wafer-bw/memcache/internal/expire"
 	"github.com/wafer-bw/memcache/internal/ports"
-	"github.com/wafer-bw/memcache/internal/store/allkeyslru"
-	"github.com/wafer-bw/memcache/internal/store/noevict"
 )
 
 var (

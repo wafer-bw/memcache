@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
 	"github.com/wafer-bw/memcache/internal/ports"
-	"github.com/wafer-bw/memcache/internal/store/allkeyslru"
 )
 
 var _ ports.Storer[int, int] = (*allkeyslru.Store[int, int])(nil)
