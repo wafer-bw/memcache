@@ -9,6 +9,7 @@ import (
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
 	"github.com/wafer-bw/memcache/internal/eviction/noevict"
+	"github.com/wafer-bw/memcache/internal/eviction/volatilelru"
 	"github.com/wafer-bw/memcache/internal/expire"
 	"github.com/wafer-bw/memcache/internal/ports"
 )
@@ -82,8 +83,7 @@ type Cache[K comparable, V any] struct {
 	activeExpirationInterval time.Duration
 }
 
-// OpenNoEvictionCache opens a new in-memory key-value cache using no eviction
-// policy.
+// OpenNoEvictionCache opens a new in-memory key-value cache.
 //
 // This policy will ignore any additional keys that would cause the cache to
 // breach its capacity.
@@ -122,14 +122,13 @@ func OpenNoEvictionCache[K comparable, V any](options ...Option[K, V]) (*Cache[K
 	return c, nil
 }
 
-// OpenLRUCache opens a new in-memory key-value cache using a least recently
-// used eviction policy.
+// OpenAllKeysLRUCache opens a new in-memory key-value cache.
 //
 // This policy evicts the least recently used key when the cache would breach
 // its capacity.
 //
 // The capacity for this policy must be greater than 0.
-func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
+func OpenAllKeysLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
 	c := &Cache[K, V]{
 		closer:   closeable.New(),
 		capacity: capacity,
@@ -154,6 +153,46 @@ func OpenLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*
 	}
 
 	c.store = allkeyslru.New[K, V](c.capacity)
+
+	if c.activeExpirationInterval > 0 {
+		go c.runActiveExpirer(c.activeExpirationInterval)
+	}
+
+	return c, nil
+}
+
+// OpenVolatileLRUCache opens a new in-memory key-value cache.
+//
+// This policy evicts the least recently used key with a ttl when the cache
+// would breach its capacity. If no keys have a ttl, then the least recently
+// used key is evicted.
+//
+// The capacity for this policy must be greater than 0.
+func OpenVolatileLRUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
+	c := &Cache[K, V]{
+		closer:   closeable.New(),
+		capacity: capacity,
+		expirer:  expire.AllKeys[K, V]{},
+	}
+
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(c); err != nil {
+			return nil, err
+		}
+	}
+
+	if c.capacity < volatilelru.MinimumCapacity {
+		return nil, InvalidCapacityError{
+			Policy:   volatilelru.PolicyName,
+			Capacity: c.capacity,
+			Minimum:  volatilelru.MinimumCapacity,
+		}
+	}
+
+	c.store = volatilelru.New[K, V](c.capacity)
 
 	if c.activeExpirationInterval > 0 {
 		go c.runActiveExpirer(c.activeExpirationInterval)

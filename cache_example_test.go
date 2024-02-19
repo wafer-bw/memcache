@@ -21,10 +21,23 @@ func ExampleOpenNoEvictionCache() {
 	defer cache.Close()
 }
 
-func ExampleOpenLRUCache() {
+func ExampleOpenAllKeysLRUCache() {
 	capacity := 10
 	interval := 1 * time.Second
-	cache, err := memcache.OpenLRUCache[int, string](capacity,
+	cache, err := memcache.OpenAllKeysLRUCache[int, string](capacity,
+		memcache.WithActiveExpiration[int, string](interval),
+		memcache.WithPassiveExpiration[int, string](),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer cache.Close()
+}
+
+func ExampleOpenVolatileLRUCache() {
+	capacity := 10
+	interval := 1 * time.Second
+	cache, err := memcache.OpenVolatileLRUCache[int, string](capacity,
 		memcache.WithActiveExpiration[int, string](interval),
 		memcache.WithPassiveExpiration[int, string](),
 	)
