@@ -241,7 +241,7 @@ func TestOpenNoEvictionCache(t *testing.T) {
 func TestOpenAllKeysLRUCache(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns a new lru cache", func(t *testing.T) {
+	t.Run("returns a new all keys lru cache", func(t *testing.T) {
 		t.Parallel()
 
 		c, err := memcache.OpenAllKeysLRUCache[int, string](10)
@@ -304,10 +304,84 @@ func TestOpenAllKeysLRUCache(t *testing.T) {
 		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
 	})
 
-	t.Run("returns an error if the capacity is less than 1", func(t *testing.T) {
+	t.Run("returns an error if the capacity is less than the minimum", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := memcache.OpenAllKeysLRUCache[int, int](0)
+		_, err := memcache.OpenAllKeysLRUCache[int, int](allkeyslru.MinimumCapacity - 1)
+		require.ErrorAs(t, err, &memcache.InvalidCapacityError{})
+	})
+}
+
+func TestOpenVolatileLRUCache(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns a new volatile lru cache", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenVolatileLRUCache[int, string](10)
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.IsType(t, &volatilelru.Store[int, string]{}, c.Store())
+	})
+
+	t.Run("does not panic when provided nil options", func(t *testing.T) {
+		t.Parallel()
+
+		require.NotPanics(t, func() {
+			c, err := memcache.OpenVolatileLRUCache[int, string](10, nil, nil)
+			require.NoError(t, err)
+			require.NotNil(t, c)
+		})
+	})
+
+	t.Run("returns an error when an option returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		errDummy := errors.New("dummy")
+
+		c, err := memcache.OpenVolatileLRUCache[int, string](10, func(c *memcache.Cache[int, string]) error { return errDummy })
+		require.ErrorIs(t, err, errDummy)
+		require.Nil(t, c)
+	})
+
+	t.Run("returns an error when opening the store returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenVolatileLRUCache[int, string](0)
+		require.Error(t, err)
+		require.Nil(t, c)
+	})
+
+	t.Run("with passive expiration enables passive expiration", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenVolatileLRUCache[int, string](10, memcache.WithPassiveExpiration[int, string]())
+		require.NoError(t, err)
+		require.True(t, c.PassiveExpiration())
+	})
+
+	t.Run("with active expiration enables active expiration", func(t *testing.T) {
+		t.Parallel()
+
+		interval := 25 * time.Millisecond
+
+		c, err := memcache.OpenVolatileLRUCache[int, string](10, memcache.WithActiveExpiration[int, string](interval))
+		require.NoError(t, err)
+		defer c.Close()
+		require.Equal(t, interval, c.ExpirationInterval())
+	})
+
+	t.Run("with active expiration returns an error if the interval is less than or equal to 0", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.OpenVolatileLRUCache[int, int](10, memcache.WithActiveExpiration[int, int](0*time.Second))
+		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
+	})
+
+	t.Run("returns an error if the capacity is less than the minimum", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.OpenVolatileLRUCache[int, int](volatilelru.MinimumCapacity - 1)
 		require.ErrorAs(t, err, &memcache.InvalidCapacityError{})
 	})
 }
