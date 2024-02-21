@@ -14,29 +14,10 @@ import (
 	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
 	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 	"github.com/wafer-bw/memcache/internal/eviction/volatilelru"
+	"github.com/wafer-bw/memcache/internal/ports"
 )
 
-type cacher[K comparable, V any] interface {
-	Set(key K, value V)
-	SetEx(key K, value V, ttl time.Duration)
-	Get(key K) (V, bool)
-	TTL(key K) (*time.Duration, bool)
-	Delete(keys ...K)
-	Size() int
-	Keys() []K
-	Flush()
-	Close()
-
-	// TODO - add the following methods:
-	// Need:
-	// - Scan()    // iterate over keys in cache (requires upcoming go iterators).
-	// Maybe:
-	// - Random()  // return random key/value from cache.
-	// - Persist() // remove ttl from key.
-	// - Expire()  // set ttl for key.
-}
-
-var _ cacher[int, int] = (*memcache.Cache[int, int])(nil)
+var _ ports.Cacher[int, int] = (*memcache.Cache[int, int])(nil)
 
 const cacheSize = 100
 
