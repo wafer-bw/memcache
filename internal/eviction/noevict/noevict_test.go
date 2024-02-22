@@ -62,3 +62,19 @@ func TestStore_Set(t *testing.T) {
 		require.Contains(t, items, 2)
 	})
 }
+
+func TestStore_Flush(t *testing.T) {
+	t.Parallel()
+
+	t.Run("clears all keys and values", func(t *testing.T) {
+		t.Parallel()
+
+		store := noevict.New[int, int](2)
+		store.Add(1, data.Item[int, int]{Value: 1})
+		store.Add(2, data.Item[int, int]{Value: 2})
+		store.Flush()
+
+		items := store.Items()
+		require.Empty(t, items)
+	})
+}

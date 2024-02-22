@@ -70,3 +70,27 @@ func TestStore_Set(t *testing.T) {
 		require.Contains(t, items, 3)
 	})
 }
+
+func TestStore_Flush(t *testing.T) {
+	t.Parallel()
+
+	t.Run("clears all keys and values", func(t *testing.T) {
+		t.Parallel()
+
+		store := allkeyslru.New[int, int](2)
+		store.Add(1, data.Item[int, int]{Value: 1})
+		store.Add(2, data.Item[int, int]{Value: 2})
+		store.Flush()
+
+		items := store.Items()
+		require.Empty(t, items)
+
+		elements, unlock := store.Elements()
+		require.Empty(t, elements)
+		unlock()
+
+		list, unlock := store.List()
+		require.Equal(t, 0, list.Len())
+		unlock()
+	})
+}

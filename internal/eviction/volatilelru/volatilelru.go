@@ -44,9 +44,9 @@ func (s *Store[K, V]) Add(key K, item data.Item[K, V]) {
 	defer s.mu.Unlock()
 
 	s.randomAccess.Add(key)
+	s.items[key] = item
 	element := s.list.PushFront(key)
 	s.elements[key] = element
-	s.items[key] = item
 
 	if len(s.items) > s.capacity {
 		s.evict()
@@ -115,9 +115,10 @@ func (s *Store[K, V]) Flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	clear(s.items)
+	s.randomAccess.Clear()
 	s.list.Init()
 	clear(s.elements)
-	clear(s.items)
 }
 
 func (s *Store[K, V]) evict() {
@@ -149,7 +150,7 @@ func (s *Store[K, V]) delete(key K) {
 	}
 
 	s.randomAccess.Remove(key)
+	delete(s.items, key)
 	s.list.Remove(element)
 	delete(s.elements, key)
-	delete(s.items, key)
 }

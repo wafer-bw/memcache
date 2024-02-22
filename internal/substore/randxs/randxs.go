@@ -7,14 +7,16 @@ import (
 
 type Store[K comparable] struct {
 	mu         sync.RWMutex
+	capacity   int
 	keys       []K       // permits random key selection
 	keyIndices map[K]int // permits fast removal from the keys slice
 }
 
-func New[K comparable](startingCapacity int) *Store[K] {
+func New[K comparable](capacity int) *Store[K] {
 	return &Store[K]{
-		keys:       make([]K, 0, startingCapacity),
-		keyIndices: make(map[K]int, startingCapacity),
+		capacity:   capacity,
+		keys:       make([]K, 0, capacity),
+		keyIndices: make(map[K]int, capacity),
 	}
 }
 
@@ -47,6 +49,14 @@ func (s *Store[K]) Remove(key K) {
 	if !isLast {
 		s.keyIndices[s.keys[index]] = index
 	}
+}
+
+func (s *Store[K]) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.keys = make([]K, 0, s.capacity)
+	clear(s.keyIndices)
 }
 
 func (s *Store[K]) RandomKey() (K, bool) {

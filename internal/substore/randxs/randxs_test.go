@@ -108,14 +108,15 @@ func TestStore_Remove(t *testing.T) {
 		capacity := 4
 		store := randxs.New[int](capacity)
 		store.Add(1)
+		store.Add(2)
 
 		store.Remove(1)
 		keys, unlock := store.Keys()
-		require.Equal(t, []int{}, keys)
+		require.Equal(t, []int{2}, keys)
 		unlock()
 
 		keyIndices, unlock := store.KeyIndices()
-		require.Equal(t, map[int]int{}, keyIndices)
+		require.Equal(t, map[int]int{2: 0}, keyIndices)
 		unlock()
 	})
 
@@ -155,6 +156,30 @@ func TestStore_Remove(t *testing.T) {
 
 		keyIndices, unlock := store.KeyIndices()
 		require.Equal(t, map[int]int{1: 0, 3: 2, 4: 1}, keyIndices)
+		unlock()
+	})
+}
+
+func TestStore_Clear(t *testing.T) {
+	t.Parallel()
+
+	t.Run("removes all keys from all structures", func(t *testing.T) {
+		t.Parallel()
+
+		capacity := 4
+		store := randxs.New[int](capacity)
+		store.Add(1)
+		store.Add(2)
+		store.Add(3)
+		store.Add(4)
+
+		store.Clear()
+		keys, unlock := store.Keys()
+		require.Empty(t, keys)
+		unlock()
+
+		keyIndices, unlock := store.KeyIndices()
+		require.Empty(t, keyIndices)
 		unlock()
 	})
 }

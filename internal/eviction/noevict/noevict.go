@@ -103,6 +103,7 @@ func (s *Store[K, V]) Flush() {
 	defer s.mu.Unlock()
 
 	clear(s.items)
+	s.randomAccess.Clear()
 }
 
 func (s *Store[K, V]) delete(key K) {

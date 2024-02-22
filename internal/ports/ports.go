@@ -23,6 +23,7 @@ type RandomAccessor[K comparable] interface {
 	Add(K)
 	Remove(K)
 	RandomKey() (K, bool)
+	Clear()
 }
 
 type Cacher[K comparable, V any] interface {
