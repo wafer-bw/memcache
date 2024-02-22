@@ -1,3 +1,6 @@
+// Package memcache provides a generic in-memory key-value cache.
+//
+// The capacity of a cache is the total number of keys it is allowed to hold.
 package memcache
 
 import (
@@ -253,6 +256,12 @@ func (c *Cache[K, V]) Delete(keys ...K) {
 // Size returns the number of items currently in the cache.
 func (c *Cache[K, V]) Size() int {
 	return c.store.Len()
+}
+
+// RandomKey returns a random key from the cache, or false if the cache is
+// empty.
+func (c *Cache[K, V]) RandomKey() (K, bool) {
+	return c.store.RandomKey()
 }
 
 // Keys returns a slice of all keys currently in the cache.

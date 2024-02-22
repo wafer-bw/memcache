@@ -1,4 +1,6 @@
 #!/bin/sh
 
+set -e
+
 echo "http://localhost:8080/github.com/wafer-bw/memcache"
 go run golang.org/x/pkgsite/cmd/pkgsite@latest
