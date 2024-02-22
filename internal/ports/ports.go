@@ -13,9 +13,16 @@ type Storer[K comparable, V any] interface {
 	Get(key K) (data.Item[K, V], bool)
 	Remove(keys ...K)
 	Len() int
+	RandomKey() (K, bool)
 	Keys() []K
 	Items() map[K]data.Item[K, V]
 	Flush()
+}
+
+type RandomAccessor[K comparable] interface {
+	Add(K)
+	Remove(K)
+	RandomKey() (K, bool)
 }
 
 type Cacher[K comparable, V any] interface {
@@ -25,17 +32,16 @@ type Cacher[K comparable, V any] interface {
 	TTL(key K) (*time.Duration, bool)
 	Delete(keys ...K)
 	Size() int
+	RandomKey() (K, bool)
 	Keys() []K
 	Flush()
 	Close()
 
-	// TODO - add the following methods:
-	// Need:
-	// - Scan()    // iterate over keys in cache (requires upcoming go iterators).
-	// - Random()  // return random key/value from cache.
-	// Maybe:
-	// - Persist() // remove ttl from key.
-	// - Expire()  // set ttl for key.
+	// TODO - Consider adding the following methods:
+	// - Scan()       // iterate over keys in cache (requires upcoming go iterators).
+	// - Random()     // return random value from cache.
+	// - Persist()    // remove ttl from key.
+	// - Expire()     // set ttl for key.
 }
 
 type Closer interface {

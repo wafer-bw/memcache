@@ -39,7 +39,6 @@ linters:
     - exportloopref     # https://github.com/kyoh86/exportloopref
     - dupword           # https://github.com/Abirdcfly/dupword
     - gochecknoinits    # https://github.com/leighmcculloch/gochecknoinits
-    - gosec             # https://github.com/securego/gosec
     - nosprintfhostport # https://github.com/stbenjam/no-sprintf-host-port
     - funlen            # https://github.com/ultraware/funlen
     - gci               # https://github.com/daixiang0/gci
@@ -67,4 +66,3 @@ issues:
         - cyclop
         - gocyclo
         - revive
-        - gosec

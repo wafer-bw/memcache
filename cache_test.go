@@ -45,6 +45,8 @@ func TestInvalidCapacityError_Error(t *testing.T) {
 }
 
 func TestCache_concurrentAccess(t *testing.T) {
+	// TODO: improve this test by making random actions against the cache
+	//       concurrently for a long time to look for deadlocks.
 	t.Run("passive expiration disabled", func(t *testing.T) {
 		for policy, newCache := range policies {
 			newCache := newCache
@@ -738,6 +740,38 @@ func TestCache_Size(t *testing.T) {
 	})
 }
 
+func TestCache_RandomKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns a random key in the cache", func(t *testing.T) {
+		t.Parallel()
+
+		for policy, newCache := range policies {
+			newCache := newCache
+			t.Run(policy, func(t *testing.T) {
+				t.Parallel()
+
+				cache, _ := newCache(cacheSize)
+				defer cache.Close()
+				store := cache.Store()
+
+				store.Add(1, data.Item[int, int]{Value: 1})
+				store.Add(2, data.Item[int, int]{Value: 1})
+				store.Add(3, data.Item[int, int]{Value: 1})
+
+				keysFound := make(map[int]struct{}, 3)
+				for i := 0; i < 100; i++ {
+					key, ok := store.RandomKey()
+					require.True(t, ok)
+					keysFound[key] = struct{}{}
+				}
+				require.Len(t, keysFound, 3)
+				require.Equal(t, keysFound, map[int]struct{}{1: {}, 2: {}, 3: {}})
+			})
+		}
+	})
+}
+
 func TestCache_Keys(t *testing.T) {
 	t.Parallel()
 
@@ -842,7 +876,7 @@ func TestCache_Close(t *testing.T) {
 				ch := make(chan struct{})
 
 				cache := func() *memcache.Cache[int, int] {
-					interval := 100 * time.Millisecond
+					interval := 50 * time.Millisecond
 					c, _ := newCache(cacheSize, memcache.WithActiveExpiration[int, int](interval))
 					runtime.SetFinalizer(c, func(_ *memcache.Cache[int, int]) {
 						close(ch)

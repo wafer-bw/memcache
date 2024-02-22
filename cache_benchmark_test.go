@@ -129,6 +129,26 @@ func BenchmarkCache_Size(b *testing.B) {
 	}
 }
 
+func BenchmarkCache_RandomKey(b *testing.B) {
+	for policy, newCache := range policies {
+		for _, size := range sizes {
+			cache, err := newCache(size)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for i := 0; i < size; i++ {
+				cache.Set(i, i)
+			}
+
+			b.Run(fmt.Sprintf("%d %s", size, policy), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					_, _ = cache.RandomKey()
+				}
+			})
+		}
+	}
+}
+
 func BenchmarkCache_Keys(b *testing.B) {
 	for policy, newCache := range policies {
 		for _, size := range sizes {

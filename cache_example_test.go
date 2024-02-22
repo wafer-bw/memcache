@@ -159,6 +159,22 @@ func ExampleCache_Size() {
 	// 2
 }
 
+func ExampleCache_RandomKey() {
+	cache, err := memcache.OpenNoEvictionCache[int, string]()
+	if err != nil {
+		panic(err)
+	}
+
+	cache.Set(1, "one")
+	cache.Set(2, "two")
+
+	key, ok := cache.RandomKey()
+	_ = key
+	fmt.Println(ok)
+	// Output:
+	// true
+}
+
 func ExampleCache_Keys() {
 	cache, err := memcache.OpenNoEvictionCache[int, string]()
 	if err != nil {

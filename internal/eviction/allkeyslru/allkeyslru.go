@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/ports"
+	"github.com/wafer-bw/memcache/internal/substore/randxs"
 )
 
 const (
@@ -16,9 +18,11 @@ const (
 type Store[K comparable, V any] struct {
 	mu       sync.RWMutex
 	capacity int
-	items    map[K]data.Item[K, V]
-	elements map[K]*list.Element
-	list     *list.List
+
+	items        map[K]data.Item[K, V]   // primary storage of key-value pairs
+	randomAccess ports.RandomAccessor[K] // permits random key selection
+	elements     map[K]*list.Element     // component of the linked list
+	list         *list.List              // component of the linked list
 }
 
 func New[K comparable, V any](capacity int) *Store[K, V] {
@@ -27,10 +31,11 @@ func New[K comparable, V any](capacity int) *Store[K, V] {
 	}
 
 	return &Store[K, V]{
-		capacity: capacity,
-		list:     list.New(),
-		elements: make(map[K]*list.Element, capacity),
-		items:    make(map[K]data.Item[K, V], capacity),
+		capacity:     capacity,
+		items:        make(map[K]data.Item[K, V], capacity),
+		randomAccess: randxs.New[K](capacity),
+		list:         list.New(),
+		elements:     make(map[K]*list.Element, capacity),
 	}
 }
 
@@ -38,6 +43,7 @@ func (s *Store[K, V]) Add(key K, item data.Item[K, V]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.randomAccess.Add(key)
 	element := s.list.PushFront(key)
 	s.elements[key] = element
 	s.items[key] = item
@@ -75,6 +81,10 @@ func (s *Store[K, V]) Len() int {
 	defer s.mu.RUnlock()
 
 	return len(s.items)
+}
+
+func (s *Store[K, V]) RandomKey() (K, bool) {
+	return s.randomAccess.RandomKey()
 }
 
 func (s *Store[K, V]) Keys() []K {
@@ -121,6 +131,7 @@ func (s *Store[K, V]) delete(key K) {
 		return
 	}
 
+	s.randomAccess.Remove(key)
 	s.list.Remove(element)
 	delete(s.elements, key)
 	delete(s.items, key)
