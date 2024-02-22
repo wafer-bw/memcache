@@ -1,6 +1,6 @@
 package expire_test
 
-//go:generate go run go.uber.org/mock/mockgen@latest -destination=../mocks/expire/expire.go -package=mockexpire . IntCacher
+//go:generate go run go.uber.org/mock/mockgen@latest -source=expire.go -destination=../mocks/mockexpire/mockexpire.go -package=mockexpire
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache/internal/expire"
-	mockexpire "github.com/wafer-bw/memcache/internal/mocks/expire"
+	"github.com/wafer-bw/memcache/internal/mocks/mockexpire"
 	"github.com/wafer-bw/memcache/internal/ports"
 	"go.uber.org/mock/gomock"
 )
@@ -24,7 +24,7 @@ func TestAllKeys_Expire(t *testing.T) {
 		expired := time.Until(time.Now().Add(-1 * time.Minute))
 		unexpired := time.Until(time.Now().Add(1 * time.Minute))
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.AllKeys[int, int]{}
 
 		gomock.InOrder(
@@ -52,7 +52,7 @@ func TestRandomSample_Expire(t *testing.T) {
 		expired := time.Until(time.Now().Add(-1 * time.Minute))
 		unexpired := time.Until(time.Now().Add(1 * time.Minute))
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.RandomSample[int, int]{
 			SampleSize:    20,
 			ExpirePercent: 0.25,
@@ -90,7 +90,7 @@ func TestRandomSample_Expire(t *testing.T) {
 		expired := time.Until(time.Now().Add(-1 * time.Minute))
 		unexpired := time.Until(time.Now().Add(1 * time.Minute))
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.RandomSample[int, int]{
 			SampleSize:    20,
 			ExpirePercent: 0.25,
@@ -144,7 +144,7 @@ func TestRandomSample_Expire(t *testing.T) {
 		t.Parallel()
 
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.RandomSample[int, int]{SampleSize: 20, ExpirePercent: 0.25}
 
 		m.EXPECT().Size().Return(0)
@@ -156,7 +156,7 @@ func TestRandomSample_Expire(t *testing.T) {
 		t.Parallel()
 
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.RandomSample[int, int]{SampleSize: 20, ExpirePercent: 0.25}
 
 		m.EXPECT().Size().Return(10)
@@ -169,7 +169,7 @@ func TestRandomSample_Expire(t *testing.T) {
 		t.Parallel()
 
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.RandomSample[int, int]{ExpirePercent: 0.25}
 
 		m.EXPECT().Size().Return(0)
@@ -182,7 +182,7 @@ func TestRandomSample_Expire(t *testing.T) {
 		t.Parallel()
 
 		ctrl := gomock.NewController(t)
-		m := mockexpire.NewMockIntCacher(ctrl)
+		m := mockexpire.NewMockCacher[int, int](ctrl)
 		sut := expire.RandomSample[int, int]{SampleSize: 20}
 
 		m.EXPECT().Size().Return(0)

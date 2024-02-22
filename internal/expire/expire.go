@@ -10,6 +10,8 @@ const (
 )
 
 // Cacher is the interface depended upon by an expirer.
+//
+// This interface is a subset of the ports.Cacher interface.
 type Cacher[K comparable, V any] interface {
 	TTL(key K) (*time.Duration, bool)
 	Delete(keys ...K)
