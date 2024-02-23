@@ -1,8 +1,12 @@
 package lfulist
 
-// TODO: replace with go linked list using list.List & list.Elements,
-// will need to be its own substore package.
+// TODO: this may be better just as part of an eviction policy store because
+//       node contents may change when we need to include ttls
+
 type list[K comparable] struct {
+	// TODO: replace with go linked list using list.List & list.Elements,
+	//       will need to be its own substore package.
+
 	head *freqNode[K]
 	tail *freqNode[K]
 	size int
