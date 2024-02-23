@@ -8,24 +8,6 @@ import (
 	"github.com/wafer-bw/memcache/internal/expire"
 )
 
-type Storer[K comparable, V any] interface {
-	Add(key K, item data.Item[K, V])
-	Get(key K) (data.Item[K, V], bool)
-	Remove(keys ...K)
-	Len() int
-	RandomKey() (K, bool)
-	Keys() []K
-	Items() map[K]data.Item[K, V]
-	Flush()
-}
-
-type RandomAccessor[K comparable] interface {
-	Add(K)
-	Remove(K)
-	RandomKey() (K, bool)
-	Clear()
-}
-
 type Cacher[K comparable, V any] interface {
 	Set(key K, value V)
 	SetEx(key K, value V, ttl time.Duration)
@@ -45,6 +27,17 @@ type Cacher[K comparable, V any] interface {
 	// - Expire()     // set ttl for key.
 }
 
+type Storer[K comparable, V any] interface {
+	Add(key K, item data.Item[K, V])
+	Get(key K) (data.Item[K, V], bool)
+	Remove(keys ...K)
+	Len() int
+	RandomKey() (K, bool)
+	Keys() []K
+	Items() map[K]data.Item[K, V]
+	Flush()
+}
+
 type Closer interface {
 	Close()
 	Closed() bool
@@ -53,4 +46,18 @@ type Closer interface {
 
 type Expirer[K comparable, V any] interface {
 	Expire(expire.Cacher[K, V])
+}
+
+type RandomAccessor[K comparable] interface {
+	Add(K)
+	Remove(K)
+	RandomKey() (K, bool)
+	Clear()
+}
+
+type LFUTracker[K comparable] interface {
+	Inc(K)
+	Remove(K)
+	LFU() K
+	Clear()
 }
