@@ -25,8 +25,7 @@ func TestNew(t *testing.T) {
 	t.Run("returns a new store with default capacity when provided an invalid one", func(t *testing.T) {
 		t.Parallel()
 
-		capacity := 1
-		store := allkeyslfu.New[int, int](capacity)
+		store := allkeyslfu.New[int, int](allkeyslfu.MinimumCapacity - 1)
 		require.Equal(t, allkeyslfu.DefaultCapacity, store.Capacity())
 	})
 }

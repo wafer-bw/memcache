@@ -62,7 +62,17 @@ func New[K comparable](capacity int) *Store[K] {
 func (s *Store[K]) Inc(key K) {
 	node, ok := s.nodes[key]
 	if !ok {
-		s.add(key)
+		node := &freqNode[K]{key: key, freq: 1}
+
+		s.min = 1
+		list, ok := s.frequencies[node.freq]
+		if !ok {
+			list = newList[K]()
+		}
+
+		list.pushBack(node)
+		s.frequencies[node.freq] = list
+		s.nodes[key] = node
 		return
 	}
 
@@ -104,23 +114,4 @@ func (s *Store[K]) Clear() {
 	clear(s.nodes)
 	clear(s.frequencies)
 	s.min = 0
-}
-
-func (s *Store[K]) add(key K) {
-	if _, ok := s.nodes[key]; ok {
-		s.Inc(key)
-		return
-	}
-
-	node := &freqNode[K]{key: key, freq: 1}
-
-	s.min = 1
-	list, ok := s.frequencies[node.freq]
-	if !ok {
-		list = newList[K]()
-	}
-
-	list.pushBack(node)
-	s.frequencies[node.freq] = list
-	s.nodes[key] = node
 }
