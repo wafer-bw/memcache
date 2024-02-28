@@ -122,6 +122,8 @@ func (s *Store[K, V]) Flush() {
 }
 
 func (s *Store[K, V]) evict() {
+	// TODO: this can be made more efficient if we only store keys for eviction
+	//       if they have a TTL.
 	cursor := s.list.Back()
 
 	for {
