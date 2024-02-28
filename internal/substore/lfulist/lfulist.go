@@ -101,8 +101,8 @@ func (s *Store[K]) LFU() K {
 }
 
 func (s *Store[K]) Clear() {
-	s.nodes = make(map[K]*freqNode[K], s.capacity)
-	s.frequencies = make(map[int]*list[K], s.capacity)
+	clear(s.nodes)
+	clear(s.frequencies)
 	s.min = 0
 }
 
