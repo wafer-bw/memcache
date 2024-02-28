@@ -97,11 +97,7 @@ func (s *Store[K]) Remove(key K) {
 }
 
 func (s *Store[K]) LFU() K {
-	minList := s.frequencies[s.min]
-	leastFrequencyNode := minList.head.next
-	key := leastFrequencyNode.key
-
-	return key
+	return s.frequencies[s.min].head.next.key
 }
 
 func (s *Store[K]) Clear() {
