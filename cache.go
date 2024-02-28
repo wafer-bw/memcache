@@ -10,6 +10,7 @@ import (
 
 	"github.com/wafer-bw/memcache/internal/closeable"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslfu"
 	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
 	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 	"github.com/wafer-bw/memcache/internal/eviction/volatilelru"
@@ -196,6 +197,45 @@ func OpenVolatileLRUCache[K comparable, V any](capacity int, options ...Option[K
 	}
 
 	c.store = volatilelru.New[K, V](c.capacity)
+
+	if c.activeExpirationInterval > 0 {
+		go c.runActiveExpirer(c.activeExpirationInterval)
+	}
+
+	return c, nil
+}
+
+// OpenAllKeysLFUCache opens a new in-memory key-value cache.
+//
+// This policy evicts the least frequently used key when the cache would breach
+// its capacity.
+//
+// The capacity for this policy must be greater than 0.
+func OpenAllKeysLFUCache[K comparable, V any](capacity int, options ...Option[K, V]) (*Cache[K, V], error) {
+	c := &Cache[K, V]{
+		closer:   closeable.New(),
+		capacity: capacity,
+		expirer:  expire.AllKeys[K, V]{},
+	}
+
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+		if err := option(c); err != nil {
+			return nil, err
+		}
+	}
+
+	if c.capacity < allkeyslfu.MinimumCapacity {
+		return nil, InvalidCapacityError{
+			Policy:   allkeyslfu.PolicyName,
+			Capacity: c.capacity,
+			Minimum:  allkeyslfu.MinimumCapacity,
+		}
+	}
+
+	c.store = allkeyslfu.New[K, V](c.capacity)
 
 	if c.activeExpirationInterval > 0 {
 		go c.runActiveExpirer(c.activeExpirationInterval)

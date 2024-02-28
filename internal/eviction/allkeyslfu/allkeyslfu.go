@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	PolicyName      string = "allkeyslru"
+	PolicyName      string = "allkeyslfu"
 	DefaultCapacity int    = 10_000
 	MinimumCapacity int    = 2
 )

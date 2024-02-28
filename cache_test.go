@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslfu"
 	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
 	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 	"github.com/wafer-bw/memcache/internal/eviction/volatilelru"
@@ -30,6 +31,9 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 	},
 	volatilelru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		return memcache.OpenVolatileLRUCache[int, int](size, options...)
+	},
+	allkeyslfu.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+		return memcache.OpenAllKeysLFUCache[int, int](size, options...)
 	},
 }
 
