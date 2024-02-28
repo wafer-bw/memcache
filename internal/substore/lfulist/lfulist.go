@@ -44,42 +44,42 @@ func (l *list[K]) remove(node *freqNode[K]) {
 }
 
 type Store[K comparable] struct {
-	nodeMap  map[K]*freqNode[K]
-	listMap  map[int]*list[K]
-	capacity int
-	min      int
+	nodes       map[K]*freqNode[K]
+	frequencies map[int]*list[K]
+	capacity    int
+	min         int
 }
 
 func New[K comparable](capacity int) *Store[K] {
 	return &Store[K]{
-		nodeMap:  make(map[K]*freqNode[K], capacity),
-		listMap:  make(map[int]*list[K], capacity),
-		capacity: capacity,
-		min:      0,
+		nodes:       make(map[K]*freqNode[K], capacity),
+		frequencies: make(map[int]*list[K], capacity),
+		capacity:    capacity,
+		min:         0,
 	}
 }
 
 func (s *Store[K]) Inc(key K) {
-	node, ok := s.nodeMap[key]
+	node, ok := s.nodes[key]
 	if !ok {
 		s.add(key)
 		return
 	}
 
-	list, ok := s.listMap[node.freq]
+	list, ok := s.frequencies[node.freq]
 	if ok {
 		list.remove(node)
 	}
 
 	node.freq++
 
-	nextList, ok := s.listMap[node.freq]
+	nextList, ok := s.frequencies[node.freq]
 	if !ok {
 		nextList = newList[K]()
 	}
 
 	nextList.pushBack(node)
-	s.listMap[node.freq] = nextList
+	s.frequencies[node.freq] = nextList
 
 	if list.size == 0 && s.min == node.freq-1 {
 		s.min++
@@ -87,17 +87,17 @@ func (s *Store[K]) Inc(key K) {
 }
 
 func (s *Store[K]) Remove(key K) {
-	node, ok := s.nodeMap[key]
+	node, ok := s.nodes[key]
 	if !ok {
 		return
 	}
 
-	s.listMap[node.freq].remove(node)
-	delete(s.nodeMap, key)
+	s.frequencies[node.freq].remove(node)
+	delete(s.nodes, key)
 }
 
 func (s *Store[K]) LFU() K {
-	minList := s.listMap[s.min]
+	minList := s.frequencies[s.min]
 	leastFrequencyNode := minList.head.next
 	key := leastFrequencyNode.key
 
@@ -105,13 +105,13 @@ func (s *Store[K]) LFU() K {
 }
 
 func (s *Store[K]) Clear() {
-	s.nodeMap = make(map[K]*freqNode[K], s.capacity)
-	s.listMap = make(map[int]*list[K], s.capacity)
+	s.nodes = make(map[K]*freqNode[K], s.capacity)
+	s.frequencies = make(map[int]*list[K], s.capacity)
 	s.min = 0
 }
 
 func (s *Store[K]) add(key K) {
-	if _, ok := s.nodeMap[key]; ok {
+	if _, ok := s.nodes[key]; ok {
 		s.Inc(key)
 		return
 	}
@@ -119,12 +119,12 @@ func (s *Store[K]) add(key K) {
 	node := &freqNode[K]{key: key, freq: 1}
 
 	s.min = 1
-	list, ok := s.listMap[node.freq]
+	list, ok := s.frequencies[node.freq]
 	if !ok {
 		list = newList[K]()
 	}
 
 	list.pushBack(node)
-	s.listMap[node.freq] = list
-	s.nodeMap[key] = node
+	s.frequencies[node.freq] = list
+	s.nodes[key] = node
 }
