@@ -25,8 +25,7 @@ func TestNew(t *testing.T) {
 	t.Run("returns a new store with default capacity when provided an invalid one", func(t *testing.T) {
 		t.Parallel()
 
-		capacity := -1
-		store := noevict.New[int, int](capacity)
+		store := noevict.New[int, int](noevict.MinimumCapacity - 1)
 		require.Equal(t, noevict.DefaultCapacity, store.Capacity())
 	})
 }

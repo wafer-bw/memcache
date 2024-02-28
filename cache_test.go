@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wafer-bw/memcache"
 	"github.com/wafer-bw/memcache/internal/data"
+	"github.com/wafer-bw/memcache/internal/eviction/allkeyslfu"
 	"github.com/wafer-bw/memcache/internal/eviction/allkeyslru"
 	"github.com/wafer-bw/memcache/internal/eviction/noevict"
 	"github.com/wafer-bw/memcache/internal/eviction/volatilelru"
@@ -30,6 +31,9 @@ var policies = map[string]func(size int, options ...memcache.Option[int, int]) (
 	},
 	volatilelru.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
 		return memcache.OpenVolatileLRUCache[int, int](size, options...)
+	},
+	allkeyslfu.PolicyName: func(size int, options ...memcache.Option[int, int]) (*memcache.Cache[int, int], error) {
+		return memcache.OpenAllKeysLFUCache[int, int](size, options...)
 	},
 }
 
@@ -291,6 +295,80 @@ func TestOpenAllKeysLRUCache(t *testing.T) {
 		t.Parallel()
 
 		_, err := memcache.OpenAllKeysLRUCache[int, int](allkeyslru.MinimumCapacity - 1)
+		require.ErrorAs(t, err, &memcache.InvalidCapacityError{})
+	})
+}
+
+func TestOpenAllKeysLFUCache(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns a new all keys lfu cache", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenAllKeysLFUCache[int, string](10)
+		require.NoError(t, err)
+		require.NotNil(t, c)
+		require.IsType(t, &allkeyslfu.Store[int, string]{}, c.Store())
+	})
+
+	t.Run("does not panic when provided nil options", func(t *testing.T) {
+		t.Parallel()
+
+		require.NotPanics(t, func() {
+			c, err := memcache.OpenAllKeysLFUCache[int, string](10, nil, nil)
+			require.NoError(t, err)
+			require.NotNil(t, c)
+		})
+	})
+
+	t.Run("returns an error when an option returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		errDummy := errors.New("dummy")
+
+		c, err := memcache.OpenAllKeysLFUCache[int, string](10, func(c *memcache.Cache[int, string]) error { return errDummy })
+		require.ErrorIs(t, err, errDummy)
+		require.Nil(t, c)
+	})
+
+	t.Run("returns an error when opening the store returns an error", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenAllKeysLFUCache[int, string](allkeyslfu.MinimumCapacity - 1)
+		require.Error(t, err)
+		require.Nil(t, c)
+	})
+
+	t.Run("with passive expiration enables passive expiration", func(t *testing.T) {
+		t.Parallel()
+
+		c, err := memcache.OpenAllKeysLFUCache[int, string](10, memcache.WithPassiveExpiration[int, string]())
+		require.NoError(t, err)
+		require.True(t, c.PassiveExpiration())
+	})
+
+	t.Run("with active expiration enables active expiration", func(t *testing.T) {
+		t.Parallel()
+
+		interval := 25 * time.Millisecond
+
+		c, err := memcache.OpenAllKeysLFUCache[int, string](10, memcache.WithActiveExpiration[int, string](interval))
+		require.NoError(t, err)
+		defer c.Close()
+		require.Equal(t, interval, c.ExpirationInterval())
+	})
+
+	t.Run("with active expiration returns an error if the interval is less than or equal to 0", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.OpenAllKeysLFUCache[int, int](10, memcache.WithActiveExpiration[int, int](0*time.Second))
+		require.ErrorIs(t, err, memcache.ErrInvalidInterval)
+	})
+
+	t.Run("returns an error if the capacity is less than the minimum", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := memcache.OpenAllKeysLFUCache[int, int](allkeyslru.MinimumCapacity - 1)
 		require.ErrorAs(t, err, &memcache.InvalidCapacityError{})
 	})
 }

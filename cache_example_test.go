@@ -10,7 +10,7 @@ import (
 func ExampleOpenNoEvictionCache() {
 	capacity := 10
 	interval := 1 * time.Second
-	cache, err := memcache.OpenNoEvictionCache[int, string](
+	cache, err := memcache.OpenNoEvictionCache(
 		memcache.WithActiveExpiration[int, string](interval),
 		memcache.WithPassiveExpiration[int, string](),
 		memcache.WithCapacity[int, string](capacity),
@@ -24,7 +24,7 @@ func ExampleOpenNoEvictionCache() {
 func ExampleOpenAllKeysLRUCache() {
 	capacity := 10
 	interval := 1 * time.Second
-	cache, err := memcache.OpenAllKeysLRUCache[int, string](capacity,
+	cache, err := memcache.OpenAllKeysLRUCache(capacity,
 		memcache.WithActiveExpiration[int, string](interval),
 		memcache.WithPassiveExpiration[int, string](),
 	)
@@ -37,7 +37,20 @@ func ExampleOpenAllKeysLRUCache() {
 func ExampleOpenVolatileLRUCache() {
 	capacity := 10
 	interval := 1 * time.Second
-	cache, err := memcache.OpenVolatileLRUCache[int, string](capacity,
+	cache, err := memcache.OpenVolatileLRUCache(capacity,
+		memcache.WithActiveExpiration[int, string](interval),
+		memcache.WithPassiveExpiration[int, string](),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer cache.Close()
+}
+
+func ExampleOpenAllKeysLFUCache() {
+	capacity := 10
+	interval := 1 * time.Second
+	cache, err := memcache.OpenAllKeysLFUCache(capacity,
 		memcache.WithActiveExpiration[int, string](interval),
 		memcache.WithPassiveExpiration[int, string](),
 	)

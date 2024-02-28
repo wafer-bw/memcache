@@ -1,16 +1,16 @@
-package volatilelru
+package allkeyslfu
 
 import (
-	"container/list"
 	"sync"
 
 	"github.com/wafer-bw/memcache/internal/data"
 	"github.com/wafer-bw/memcache/internal/ports"
+	"github.com/wafer-bw/memcache/internal/substore/lfulist"
 	"github.com/wafer-bw/memcache/internal/substore/randxs"
 )
 
 const (
-	PolicyName      string = "volatilelru"
+	PolicyName      string = "allkeyslfu"
 	DefaultCapacity int    = 10_000
 	MinimumCapacity int    = 2
 )
@@ -21,8 +21,7 @@ type Store[K comparable, V any] struct {
 
 	items        map[K]data.Item[K, V]   // primary storage of key-value pairs
 	randomAccess ports.RandomAccessor[K] // permits random key selection
-	elements     map[K]*list.Element     // component of the linked list
-	list         *list.List              // component of the linked list
+	lfu          ports.LFUTracker[K]     // permits least frequently used key selection
 }
 
 func New[K comparable, V any](capacity int) *Store[K, V] {
@@ -34,8 +33,7 @@ func New[K comparable, V any](capacity int) *Store[K, V] {
 		capacity:     capacity,
 		items:        make(map[K]data.Item[K, V], capacity),
 		randomAccess: randxs.New[K](capacity),
-		list:         list.New(),
-		elements:     make(map[K]*list.Element, capacity),
+		lfu:          lfulist.New[K](capacity),
 	}
 }
 
@@ -45,8 +43,7 @@ func (s *Store[K, V]) Add(key K, item data.Item[K, V]) {
 
 	s.randomAccess.Add(key)
 	s.items[key] = item
-	element := s.list.PushFront(key)
-	s.elements[key] = element
+	s.lfu.Inc(key)
 
 	if len(s.items) > s.capacity {
 		s.evict()
@@ -62,7 +59,7 @@ func (s *Store[K, V]) Get(key K) (data.Item[K, V], bool) {
 		return item, ok
 	}
 
-	s.list.MoveToFront(s.elements[key])
+	s.lfu.Inc(key)
 
 	return item, ok
 }
@@ -73,6 +70,7 @@ func (s *Store[K, V]) Remove(keys ...K) {
 
 	for _, key := range keys {
 		s.delete(key)
+		s.lfu.Remove(key)
 	}
 }
 
@@ -117,42 +115,15 @@ func (s *Store[K, V]) Flush() {
 
 	clear(s.items)
 	s.randomAccess.Clear()
-	s.list.Init()
-	clear(s.elements)
+	s.lfu.Clear()
 }
 
 func (s *Store[K, V]) evict() {
-	// TODO: this can be made more efficient if we only store keys for eviction
-	//       if they have a TTL.
-	cursor := s.list.Back()
-
-	for {
-		key, _ := cursor.Value.(K)
-		item := s.items[key]
-
-		if item.ExpireAt != nil {
-			s.delete(key)
-			return
-		}
-
-		cursor = cursor.Prev()
-		if cursor == nil {
-			break
-		}
-	}
-
-	key, _ := s.list.Back().Value.(K)
-	s.delete(key)
+	s.delete(s.lfu.LFU())
 }
 
 func (s *Store[K, V]) delete(key K) {
-	element, ok := s.elements[key]
-	if !ok {
-		return
-	}
-
-	s.randomAccess.Remove(key)
 	delete(s.items, key)
-	s.list.Remove(element)
-	delete(s.elements, key)
+	s.randomAccess.Remove(key)
+	s.lfu.Remove(key)
 }
