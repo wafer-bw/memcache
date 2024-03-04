@@ -3,7 +3,7 @@ module github.com/wafer-bw/memcache
 go 1.21.1
 
 require (
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.4.0
 )
 
